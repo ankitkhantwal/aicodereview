@@ -193,9 +193,18 @@ function createPrompt(file: File, chunk: Chunk, prDetails: PRDetails): string {
 - Do not give positive comments or compliments.
 - Provide comments and suggestions ONLY if there is something to improve, otherwise "reviews" should be an empty array.
 - Write the comment in GitHub Markdown format.
+- Focus exclusively on functional issues, potential bugs, and performance improvements.
+- For imports: ONLY comment if the import statement would cause a definitive runtime error.
+- Key areas to review:
+  * Error handling and exception cases
+  * Resource management (file handles, memory, etc.)
+  * Security concerns
+  * Performance bottlenecks
+  * File system operations
+  * Process management
+  * Standard compliance issues
 - Use the given description only for the overall context and only comment on the code.
 - IMPORTANT: NEVER suggest adding comments to the code.
-- Unless confident, do not suggest imports are invalid
 
 Review the following code diff in the file "${
     file.to
