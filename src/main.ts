@@ -106,7 +106,11 @@ async function getPRDetails(eventData: PullRequestEvent): Promise<PRDetails> {
 }
 
 // Function to get the diff of a pull request
-async function getDiff(owner: string, repo: string, pull_number: number): Promise<string> {
+async function getDiff(
+  owner: string,
+  repo: string,
+  pull_number: number
+): Promise<string> {
   try {
     const response = await octokit.pulls.get({
       owner,
@@ -189,7 +193,9 @@ function createPrompt(file: File, chunk: Chunk, prDetails: PRDetails): string {
 - Use the given description only for the overall context and only comment on the code.
 - IMPORTANT: NEVER suggest adding comments to the code.
 
-Review the following code diff in the file "${file.to}" and take the pull request title and description into account when writing the response.
+Review the following code diff in the file "${
+    file.to
+  }" and take the pull request title and description into account when writing the response.
 
 Pull request title: ${prDetails.title}
 Pull request description:
@@ -202,15 +208,16 @@ Git diff to review:
 
 \`\`\`diff
 ${chunk.content}
-${chunk.changes
-    .map((c) => `${c.ln ? c.ln : c.ln2} ${c.content}`)
-    .join("\n")}
+${chunk.changes.map((c) => `${c.ln ? c.ln : c.ln2} ${c.content}`).join("\n")}
 \`\`\`
 `;
 }
 
 // Function to get AI response
-async function getAIResponse(prompt: string, generation: any): Promise<AIReview[] | null> {
+async function getAIResponse(
+  prompt: string,
+  generation: any
+): Promise<AIReview[] | null> {
   try {
     const response = await openai.chat.completions.create({
       ...OPENAI_QUERY_CONFIG,
@@ -266,7 +273,9 @@ async function createReviewComment(
     });
     console.log(`Created ${comments.length} review comment(s).`);
   } catch (error) {
-    throw new Error(`Failed to create review comments: ${(error as Error).message}`);
+    throw new Error(
+      `Failed to create review comments: ${(error as Error).message}`
+    );
   }
 }
 
@@ -306,10 +315,16 @@ async function main() {
     // Get diff based on action
     let diff: string;
     if (eventData.action === ACTION_OPENED) {
-      diff = await getDiff(prDetails.owner, prDetails.repo, prDetails.pull_number);
+      diff = await getDiff(
+        prDetails.owner,
+        prDetails.repo,
+        prDetails.pull_number
+      );
     } else if (eventData.action === ACTION_SYNCHRONIZE) {
       if (!eventData.before || !eventData.after) {
-        throw new Error("Both 'before' and 'after' SHAs are required for synchronize action.");
+        throw new Error(
+          "Both 'before' and 'after' SHAs are required for synchronize action."
+        );
       }
 
       const response = await octokit.repos.compareCommits({
