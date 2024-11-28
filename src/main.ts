@@ -4,16 +4,31 @@ import OpenAI from "openai";
 import { Octokit } from "@octokit/rest";
 import parseDiff, { Chunk, File } from "parse-diff";
 import minimatch from "minimatch";
+import { Langfuse } from "langfuse";
 
-const GITHUB_TOKEN: string = core.getInput("GITHUB_TOKEN");
-const OPENAI_API_KEY: string = core.getInput("OPENAI_API_KEY");
-const OPENAI_API_MODEL: string = core.getInput("OPENAI_API_MODEL");
+// Constants for action names and input names
+const ACTION_OPENED = "opened";
+const ACTION_SYNCHRONIZE = "synchronize";
+const INPUT_GITHUB_TOKEN = "GITHUB_TOKEN";
+const INPUT_OPENAI_API_KEY = "OPENAI_API_KEY";
+const INPUT_OPENAI_API_MODEL = "OPENAI_API_MODEL";
+const INPUT_EXCLUDE = "exclude";
 
-const octokit = new Octokit({ auth: GITHUB_TOKEN });
+// TypeScript interfaces for GitHub event data
+interface Repository {
+  owner: {
+    login: string;
+  };
+  name: string;
+}
 
-const openai = new OpenAI({
-  apiKey: OPENAI_API_KEY,
-});
+interface PullRequestEvent {
+  action: string;
+  number: number;
+  repository: Repository;
+  before?: string;
+  after?: string;
+}
 
 interface PRDetails {
   owner: string;
@@ -23,74 +38,159 @@ interface PRDetails {
   description: string;
 }
 
-async function getPRDetails(): Promise<PRDetails> {
-  const { repository, number } = JSON.parse(
-    readFileSync(process.env.GITHUB_EVENT_PATH || "", "utf8")
-  );
-  const prResponse = await octokit.pulls.get({
-    owner: repository.owner.login,
-    repo: repository.name,
-    pull_number: number,
-  });
-  return {
-    owner: repository.owner.login,
-    repo: repository.name,
-    pull_number: number,
-    title: prResponse.data.title ?? "",
-    description: prResponse.data.body ?? "",
-  };
+interface AIReview {
+  lineNumber: string;
+  reviewComment: string;
 }
 
-async function getDiff(
-  owner: string,
-  repo: string,
-  pull_number: number
-): Promise<string | null> {
-  const response = await octokit.pulls.get({
-    owner,
-    repo,
-    pull_number,
-    mediaType: { format: "diff" },
-  });
-  // @ts-expect-error - response.data is a string
-  return response.data;
+interface Comment {
+  body: string;
+  path: string;
+  line: number;
 }
 
+// Initialize Langfuse
+const langfuse = new Langfuse({
+  release: process.env.LANGFUSE_RELEASE || "unknown",
+  requestTimeout: 10000,
+  enabled: Boolean(process.env.LANGFUSE_SECRET_KEY),
+});
+
+// Handle Langfuse errors
+langfuse.on("error", (error) => {
+  console.error("Langfuse Error:", error);
+});
+
+// Optionally enable debugging
+// langfuse.debug();
+
+// Initialize Octokit with GitHub Token
+const octokit = new Octokit({
+  auth: core.getInput(INPUT_GITHUB_TOKEN, { required: true }),
+});
+
+// Initialize OpenAI with API Key
+const openai = new OpenAI({
+  apiKey: core.getInput(INPUT_OPENAI_API_KEY, { required: true }),
+});
+
+// OpenAI query configuration
+const OPENAI_QUERY_CONFIG = {
+  model: core.getInput(INPUT_OPENAI_API_MODEL, { required: true }),
+  temperature: 0.2,
+  max_tokens: 700,
+  top_p: 1,
+  frequency_penalty: 0,
+  presence_penalty: 0,
+};
+
+// Function to get PR details from event data
+async function getPRDetails(eventData: PullRequestEvent): Promise<PRDetails> {
+  try {
+    const prResponse = await octokit.pulls.get({
+      owner: eventData.repository.owner.login,
+      repo: eventData.repository.name,
+      pull_number: eventData.number,
+    });
+
+    return {
+      owner: eventData.repository.owner.login,
+      repo: eventData.repository.name,
+      pull_number: eventData.number,
+      title: prResponse.data.title ?? "",
+      description: prResponse.data.body ?? "",
+    };
+  } catch (error) {
+    throw new Error(`Failed to get PR details: ${(error as Error).message}`);
+  }
+}
+
+// Function to get the diff of a pull request
+async function getDiff(owner: string, repo: string, pull_number: number): Promise<string> {
+  try {
+    const response = await octokit.pulls.get({
+      owner,
+      repo,
+      pull_number,
+      mediaType: { format: "diff" },
+    });
+
+    // Explicitly type response.data as string
+    return String(response.data);
+  } catch (error) {
+    throw new Error(`Failed to get PR diff: ${(error as Error).message}`);
+  }
+}
+
+// Function to analyze code changes using AI
 async function analyzeCode(
   parsedDiff: File[],
-  prDetails: PRDetails
-): Promise<Array<{ body: string; path: string; line: number }>> {
-  const comments: Array<{ body: string; path: string; line: number }> = [];
+  prDetails: PRDetails,
+  trace: any // Adjust the type as per Langfuse's TypeScript definitions
+): Promise<Comment[]> {
+  const comments: Comment[] = [];
 
-  for (const file of parsedDiff) {
-    if (file.to === "/dev/null") continue; // Ignore deleted files
-    for (const chunk of file.chunks) {
-      const prompt = createPrompt(file, chunk, prDetails);
-      const aiResponse = await getAIResponse(prompt);
-      if (aiResponse) {
-        const newComments = createComment(file, chunk, aiResponse);
-        if (newComments) {
-          comments.push(...newComments);
-        }
-      }
-    }
-  }
+  // Process each file concurrently
+  await Promise.all(
+    parsedDiff.map(async (file) => {
+      if (file.to === "/dev/null") return; // Ignore deleted files
+
+      // Process each chunk in the file concurrently
+      const fileComments = await Promise.all(
+        file.chunks.map(async (chunk) => {
+          const prompt = createPrompt(file, chunk, prDetails);
+
+          // Create a generation in Langfuse
+          const generation = trace.generation({
+            name: "openai-chat-completion",
+            model: OPENAI_QUERY_CONFIG.model,
+            modelParameters: {
+              temperature: OPENAI_QUERY_CONFIG.temperature,
+              maxTokens: OPENAI_QUERY_CONFIG.max_tokens,
+              top_p: OPENAI_QUERY_CONFIG.top_p,
+              frequency_penalty: OPENAI_QUERY_CONFIG.frequency_penalty,
+              presence_penalty: OPENAI_QUERY_CONFIG.presence_penalty,
+            },
+            input: prompt,
+          });
+
+          const aiResponses = await getAIResponse(prompt, generation);
+          if (aiResponses) {
+            generation.end({
+              output: aiResponses,
+            });
+            return createComments(file, aiResponses);
+          } else {
+            generation.end({
+              output: null,
+            });
+            return [];
+          }
+        })
+      );
+
+      // Flatten and add to comments
+      fileComments.forEach((commentArray) => {
+        comments.push(...commentArray);
+      });
+    })
+  );
+
   return comments;
 }
 
+// Function to create AI prompt
 function createPrompt(file: File, chunk: Chunk, prDetails: PRDetails): string {
   return `Your task is to review pull requests. Instructions:
-- Provide the response in following JSON format:  {"reviews": [{"lineNumber":  <line_number>, "reviewComment": "<review comment>"}]}
+- Provide the response in the following JSON format: {"reviews": [{"lineNumber": <line_number>, "reviewComment": "<review comment>"}]}
 - Do not give positive comments or compliments.
 - Provide comments and suggestions ONLY if there is something to improve, otherwise "reviews" should be an empty array.
 - Write the comment in GitHub Markdown format.
-- Use the given description only for the overall context and only comment the code.
+- Use the given description only for the overall context and only comment on the code.
 - IMPORTANT: NEVER suggest adding comments to the code.
 
-Review the following code diff in the file "${
-    file.to
-  }" and take the pull request title and description into account when writing the response.
-  
+Review the following code diff in the file "${file.to}" and take the pull request title and description into account when writing the response.
+
 Pull request title: ${prDetails.title}
 Pull request description:
 
@@ -103,145 +203,180 @@ Git diff to review:
 \`\`\`diff
 ${chunk.content}
 ${chunk.changes
-  // @ts-expect-error - ln and ln2 exists where needed
-  .map((c) => `${c.ln ? c.ln : c.ln2} ${c.content}`)
-  .join("\n")}
+    .map((c) => `${c.ln ? c.ln : c.ln2} ${c.content}`)
+    .join("\n")}
 \`\`\`
 `;
 }
 
-async function getAIResponse(prompt: string): Promise<Array<{
-  lineNumber: string;
-  reviewComment: string;
-}> | null> {
-  const queryConfig = {
-    model: OPENAI_API_MODEL,
-    temperature: 0.2,
-    max_tokens: 700,
-    top_p: 1,
-    frequency_penalty: 0,
-    presence_penalty: 0,
-  };
-
+// Function to get AI response
+async function getAIResponse(prompt: string, generation: any): Promise<AIReview[] | null> {
   try {
     const response = await openai.chat.completions.create({
-      ...queryConfig,
-      response_format: { type: "json_object" },
+      ...OPENAI_QUERY_CONFIG,
       messages: [
         {
-          role: "system",
+          role: "user",
           content: prompt,
         },
       ],
     });
 
-    const res = response.choices[0].message?.content?.trim() || "{}";
-    console.log("AI response:", res);
-    return JSON.parse(res).reviews;
+    const aiContent = response.choices[0].message?.content?.trim();
+    if (!aiContent) {
+      console.warn("AI response is empty.");
+      return null;
+    }
+
+    console.log("AI response:", aiContent);
+
+    const parsed = JSON.parse(aiContent);
+    return parsed.reviews as AIReview[];
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error fetching AI response:", (error as Error).message);
     return null;
   }
 }
 
-function createComment(
-  file: File,
-  chunk: Chunk,
-  aiResponses: Array<{
-    lineNumber: string;
-    reviewComment: string;
-  }>
-): Array<{ body: string; path: string; line: number }> {
-  return aiResponses.flatMap((aiResponse) => {
-    if (!file.to) {
-      return [];
-    }
-    return {
-      body: aiResponse.reviewComment,
-      path: file.to,
-      line: Number(aiResponse.lineNumber),
-    };
-  });
+// Function to create comments from AI responses
+function createComments(file: File, aiResponses: AIReview[]): Comment[] {
+  if (!file.to) return [];
+
+  return aiResponses.map((aiResponse) => ({
+    body: aiResponse.reviewComment,
+    path: file.to || "",
+    line: Number(aiResponse.lineNumber),
+  }));
 }
 
+// Function to create review comments on GitHub
 async function createReviewComment(
   owner: string,
   repo: string,
   pull_number: number,
-  comments: Array<{ body: string; path: string; line: number }>
+  comments: Comment[]
 ): Promise<void> {
-  await octokit.pulls.createReview({
-    owner,
-    repo,
-    pull_number,
-    comments,
-    event: "COMMENT",
-  });
+  try {
+    await octokit.pulls.createReview({
+      owner,
+      repo,
+      pull_number,
+      comments,
+      event: "COMMENT",
+    });
+    console.log(`Created ${comments.length} review comment(s).`);
+  } catch (error) {
+    throw new Error(`Failed to create review comments: ${(error as Error).message}`);
+  }
 }
 
+// Main function orchestrating the workflow
 async function main() {
-  const prDetails = await getPRDetails();
-  let diff: string | null;
-  const eventData = JSON.parse(
-    readFileSync(process.env.GITHUB_EVENT_PATH ?? "", "utf8")
-  );
+  let trace;
+  try {
+    const eventPath = process.env.GITHUB_EVENT_PATH;
+    if (!eventPath) {
+      throw new Error("GITHUB_EVENT_PATH is not defined.");
+    }
 
-  if (eventData.action === "opened") {
-    diff = await getDiff(
-      prDetails.owner,
-      prDetails.repo,
-      prDetails.pull_number
-    );
-  } else if (eventData.action === "synchronize") {
-    const newBaseSha = eventData.before;
-    const newHeadSha = eventData.after;
+    const eventDataRaw = readFileSync(eventPath, "utf8");
+    const eventData: PullRequestEvent = JSON.parse(eventDataRaw);
 
-    const response = await octokit.repos.compareCommits({
-      headers: {
-        accept: "application/vnd.github.v3.diff",
-      },
-      owner: prDetails.owner,
-      repo: prDetails.repo,
-      base: newBaseSha,
-      head: newHeadSha,
+    if (!eventData.action) {
+      throw new Error("Event action is not defined.");
+    }
+
+    // Only handle 'opened' and 'synchronize' actions
+    if (![ACTION_OPENED, ACTION_SYNCHRONIZE].includes(eventData.action)) {
+      console.log(`Unsupported event action: ${eventData.action}`);
+      return;
+    }
+
+    // Get PR details
+    const prDetails = await getPRDetails(eventData);
+
+    // Initialize trace
+    trace = langfuse.trace({
+      name: "github-action-pr-review",
+      userId: prDetails.owner, // You can adjust this to a more appropriate identifier
+      metadata: { repo: prDetails.repo, pull_number: prDetails.pull_number },
+      tags: ["github-action"],
     });
 
-    diff = String(response.data);
-  } else {
-    console.log("Unsupported event:", process.env.GITHUB_EVENT_NAME);
-    return;
-  }
+    // Get diff based on action
+    let diff: string;
+    if (eventData.action === ACTION_OPENED) {
+      diff = await getDiff(prDetails.owner, prDetails.repo, prDetails.pull_number);
+    } else if (eventData.action === ACTION_SYNCHRONIZE) {
+      if (!eventData.before || !eventData.after) {
+        throw new Error("Both 'before' and 'after' SHAs are required for synchronize action.");
+      }
 
-  if (!diff) {
-    console.log("No diff found");
-    return;
-  }
+      const response = await octokit.repos.compareCommits({
+        headers: {
+          accept: "application/vnd.github.v3.diff",
+        },
+        owner: prDetails.owner,
+        repo: prDetails.repo,
+        base: eventData.before,
+        head: eventData.after,
+      });
 
-  const parsedDiff = parseDiff(diff);
+      diff = String(response.data);
+    } else {
+      // This else is redundant due to the earlier check but kept for safety
+      console.log("No diff found for unsupported action.");
+      return;
+    }
 
-  const excludePatterns = core
-    .getInput("exclude")
-    .split(",")
-    .map((s) => s.trim());
+    if (!diff) {
+      console.log("No diff found.");
+      return;
+    }
 
-  const filteredDiff = parsedDiff.filter((file) => {
-    return !excludePatterns.some((pattern) =>
-      minimatch(file.to ?? "", pattern)
-    );
-  });
+    // Parse the diff
+    const parsedDiff = parseDiff(diff);
 
-  const comments = await analyzeCode(filteredDiff, prDetails);
-  if (comments.length > 0) {
-    await createReviewComment(
-      prDetails.owner,
-      prDetails.repo,
-      prDetails.pull_number,
-      comments
-    );
+    // Get exclude patterns
+    const excludePatternsInput = core.getInput(INPUT_EXCLUDE);
+    const excludePatterns = excludePatternsInput
+      ? excludePatternsInput.split(",").map((pattern) => pattern.trim())
+      : [];
+
+    // Filter out excluded files
+    const filteredDiff = parsedDiff.filter((file) => {
+      const filePath = file.to ?? "";
+      return !excludePatterns.some((pattern) => minimatch(filePath, pattern));
+    });
+
+    if (filteredDiff.length === 0) {
+      console.log("No files to analyze after applying exclude patterns.");
+      return;
+    }
+
+    // Analyze code to get comments
+    const comments = await analyzeCode(filteredDiff, prDetails, trace);
+
+    if (comments.length > 0) {
+      await createReviewComment(
+        prDetails.owner,
+        prDetails.repo,
+        prDetails.pull_number,
+        comments
+      );
+    } else {
+      console.log("No comments to post.");
+    }
+  } catch (error) {
+    console.error("Error in main execution:", (error as Error).message);
+    core.setFailed((error as Error).message);
+    process.exit(1);
+  } finally {
+    if (langfuse.enabled) {
+      await langfuse.shutdownAsync();
+    }
   }
 }
 
-main().catch((error) => {
-  console.error("Error:", error);
-  process.exit(1);
-});
+// Execute the main function
+main();
