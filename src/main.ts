@@ -13,6 +13,8 @@ const INPUT_GITHUB_TOKEN = "GITHUB_TOKEN";
 const INPUT_OPENAI_API_KEY = "OPENAI_API_KEY";
 const INPUT_OPENAI_API_MODEL = "OPENAI_API_MODEL";
 const INPUT_EXCLUDE = "exclude";
+const INPUT_LANGFUSE_SECRET_KEY = "LANGFUSE_SECRET_KEY";
+const INPUT_LANGFUSE_PUBLIC_KEY = "LANGFUSE_PUBLIC_KEY";
 
 // TypeScript interfaces for GitHub event data
 interface Repository {
@@ -53,7 +55,9 @@ interface Comment {
 const langfuse = new Langfuse({
   release: process.env.LANGFUSE_RELEASE || "unknown",
   requestTimeout: 10000,
-  enabled: Boolean(process.env.LANGFUSE_SECRET_KEY),
+  enabled: Boolean(core.getInput(INPUT_LANGFUSE_SECRET_KEY)),
+  secretKey: core.getInput(INPUT_LANGFUSE_SECRET_KEY),
+  publicKey: core.getInput(INPUT_LANGFUSE_PUBLIC_KEY),
 });
 
 // Handle Langfuse errors
@@ -208,7 +212,10 @@ Git diff to review:
 
 \`\`\`diff
 ${chunk.content}
-${chunk.changes.map((c) => `${c.ln ? c.ln : c.ln2} ${c.content}`).join("\n")}
+${chunk.changes
+  // @ts-expect-error - ln and ln2 exists where needed
+  .map((c) => `${c.ln ? c.ln : c.ln2} ${c.content}`)
+  .join("\n")}
 \`\`\`
 `;
 }
@@ -387,6 +394,7 @@ async function main() {
     core.setFailed((error as Error).message);
     process.exit(1);
   } finally {
+    // @ts-ignore
     if (langfuse.enabled) {
       await langfuse.shutdownAsync();
     }

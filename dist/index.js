@@ -6,88 +6,41 @@ require('./sourcemap-register.js');/******/ (() => { // webpackBootstrap
 
 "use strict";
 
-var __createBinding =
-  (this && this.__createBinding) ||
-  (Object.create
-    ? function (o, m, k, k2) {
-        if (k2 === undefined) k2 = k;
-        var desc = Object.getOwnPropertyDescriptor(m, k);
-        if (
-          !desc ||
-          ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)
-        ) {
-          desc = {
-            enumerable: true,
-            get: function () {
-              return m[k];
-            },
-          };
-        }
-        Object.defineProperty(o, k2, desc);
-      }
-    : function (o, m, k, k2) {
-        if (k2 === undefined) k2 = k;
-        o[k2] = m[k];
-      });
-var __setModuleDefault =
-  (this && this.__setModuleDefault) ||
-  (Object.create
-    ? function (o, v) {
-        Object.defineProperty(o, "default", { enumerable: true, value: v });
-      }
-    : function (o, v) {
-        o["default"] = v;
-      });
-var __importStar =
-  (this && this.__importStar) ||
-  function (mod) {
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
     if (mod && mod.__esModule) return mod;
     var result = {};
-    if (mod != null)
-      for (var k in mod)
-        if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k))
-          __createBinding(result, mod, k);
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
     __setModuleDefault(result, mod);
     return result;
-  };
-var __awaiter =
-  (this && this.__awaiter) ||
-  function (thisArg, _arguments, P, generator) {
-    function adopt(value) {
-      return value instanceof P
-        ? value
-        : new P(function (resolve) {
-            resolve(value);
-          });
-    }
+};
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
-      function fulfilled(value) {
-        try {
-          step(generator.next(value));
-        } catch (e) {
-          reject(e);
-        }
-      }
-      function rejected(value) {
-        try {
-          step(generator["throw"](value));
-        } catch (e) {
-          reject(e);
-        }
-      }
-      function step(result) {
-        result.done
-          ? resolve(result.value)
-          : adopt(result.value).then(fulfilled, rejected);
-      }
-      step((generator = generator.apply(thisArg, _arguments || [])).next());
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
-  };
-var __importDefault =
-  (this && this.__importDefault) ||
-  function (mod) {
-    return mod && mod.__esModule ? mod : { default: mod };
-  };
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 const fs_1 = __nccwpck_require__(7147);
 const core = __importStar(__nccwpck_require__(2186));
@@ -95,78 +48,147 @@ const openai_1 = __importDefault(__nccwpck_require__(47));
 const rest_1 = __nccwpck_require__(5375);
 const parse_diff_1 = __importDefault(__nccwpck_require__(4833));
 const minimatch_1 = __importDefault(__nccwpck_require__(2002));
-const GITHUB_TOKEN = core.getInput("GITHUB_TOKEN");
-const OPENAI_API_KEY = core.getInput("OPENAI_API_KEY");
-const OPENAI_API_MODEL = core.getInput("OPENAI_API_MODEL");
-const octokit = new rest_1.Octokit({ auth: GITHUB_TOKEN });
-const openai = new openai_1.default({
-  apiKey: OPENAI_API_KEY,
+const langfuse_1 = __nccwpck_require__(5423);
+// Constants for action names and input names
+const ACTION_OPENED = "opened";
+const ACTION_SYNCHRONIZE = "synchronize";
+const INPUT_GITHUB_TOKEN = "GITHUB_TOKEN";
+const INPUT_OPENAI_API_KEY = "OPENAI_API_KEY";
+const INPUT_OPENAI_API_MODEL = "OPENAI_API_MODEL";
+const INPUT_EXCLUDE = "exclude";
+const INPUT_LANGFUSE_SECRET_KEY = "LANGFUSE_SECRET_KEY";
+const INPUT_LANGFUSE_PUBLIC_KEY = "LANGFUSE_PUBLIC_KEY";
+// Initialize Langfuse
+const langfuse = new langfuse_1.Langfuse({
+    release: process.env.LANGFUSE_RELEASE || "unknown",
+    requestTimeout: 10000,
+    enabled: Boolean(core.getInput(INPUT_LANGFUSE_SECRET_KEY)),
+    secretKey: core.getInput(INPUT_LANGFUSE_SECRET_KEY),
+    publicKey: core.getInput(INPUT_LANGFUSE_PUBLIC_KEY),
 });
-function getPRDetails() {
-  var _a, _b;
-  return __awaiter(this, void 0, void 0, function* () {
-    const { repository, number } = JSON.parse(
-      (0, fs_1.readFileSync)(process.env.GITHUB_EVENT_PATH || "", "utf8")
-    );
-    const prResponse = yield octokit.pulls.get({
-      owner: repository.owner.login,
-      repo: repository.name,
-      pull_number: number,
-    });
-    return {
-      owner: repository.owner.login,
-      repo: repository.name,
-      pull_number: number,
-      title: (_a = prResponse.data.title) !== null && _a !== void 0 ? _a : "",
-      description:
-        (_b = prResponse.data.body) !== null && _b !== void 0 ? _b : "",
-    };
-  });
-}
-function getDiff(owner, repo, pull_number) {
-  return __awaiter(this, void 0, void 0, function* () {
-    const response = yield octokit.pulls.get({
-      owner,
-      repo,
-      pull_number,
-      mediaType: { format: "diff" },
-    });
-    // @ts-expect-error - response.data is a string
-    return response.data;
-  });
-}
-function analyzeCode(parsedDiff, prDetails) {
-  return __awaiter(this, void 0, void 0, function* () {
-    const comments = [];
-    for (const file of parsedDiff) {
-      if (file.to === "/dev/null") continue; // Ignore deleted files
-      for (const chunk of file.chunks) {
-        const prompt = createPrompt(file, chunk, prDetails);
-        const aiResponse = yield getAIResponse(prompt);
-        if (aiResponse) {
-          const newComments = createComment(file, chunk, aiResponse);
-          if (newComments) {
-            comments.push(...newComments);
-          }
+// Handle Langfuse errors
+langfuse.on("error", (error) => {
+    console.error("Langfuse Error:", error);
+});
+// Optionally enable debugging
+// langfuse.debug();
+// Initialize Octokit with GitHub Token
+const octokit = new rest_1.Octokit({
+    auth: core.getInput(INPUT_GITHUB_TOKEN, { required: true }),
+});
+// Initialize OpenAI with API Key
+const openai = new openai_1.default({
+    apiKey: core.getInput(INPUT_OPENAI_API_KEY, { required: true }),
+});
+// OpenAI query configuration
+const OPENAI_QUERY_CONFIG = {
+    model: core.getInput(INPUT_OPENAI_API_MODEL, { required: true }),
+    temperature: 0.2,
+    max_tokens: 700,
+    top_p: 1,
+    frequency_penalty: 0,
+    presence_penalty: 0,
+};
+// Function to get PR details from event data
+function getPRDetails(eventData) {
+    var _a, _b;
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const prResponse = yield octokit.pulls.get({
+                owner: eventData.repository.owner.login,
+                repo: eventData.repository.name,
+                pull_number: eventData.number,
+            });
+            return {
+                owner: eventData.repository.owner.login,
+                repo: eventData.repository.name,
+                pull_number: eventData.number,
+                title: (_a = prResponse.data.title) !== null && _a !== void 0 ? _a : "",
+                description: (_b = prResponse.data.body) !== null && _b !== void 0 ? _b : "",
+            };
         }
-      }
-    }
-    return comments;
-  });
+        catch (error) {
+            throw new Error(`Failed to get PR details: ${error.message}`);
+        }
+    });
 }
+// Function to get the diff of a pull request
+function getDiff(owner, repo, pull_number) {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const response = yield octokit.pulls.get({
+                owner,
+                repo,
+                pull_number,
+                mediaType: { format: "diff" },
+            });
+            // Explicitly type response.data as string
+            return String(response.data);
+        }
+        catch (error) {
+            throw new Error(`Failed to get PR diff: ${error.message}`);
+        }
+    });
+}
+// Function to analyze code changes using AI
+function analyzeCode(parsedDiff, prDetails, trace // Adjust the type as per Langfuse's TypeScript definitions
+) {
+    return __awaiter(this, void 0, void 0, function* () {
+        const comments = [];
+        // Process each file concurrently
+        yield Promise.all(parsedDiff.map((file) => __awaiter(this, void 0, void 0, function* () {
+            if (file.to === "/dev/null")
+                return; // Ignore deleted files
+            // Process each chunk in the file concurrently
+            const fileComments = yield Promise.all(file.chunks.map((chunk) => __awaiter(this, void 0, void 0, function* () {
+                const prompt = createPrompt(file, chunk, prDetails);
+                // Create a generation in Langfuse
+                const generation = trace.generation({
+                    name: "openai-chat-completion",
+                    model: OPENAI_QUERY_CONFIG.model,
+                    modelParameters: {
+                        temperature: OPENAI_QUERY_CONFIG.temperature,
+                        maxTokens: OPENAI_QUERY_CONFIG.max_tokens,
+                        top_p: OPENAI_QUERY_CONFIG.top_p,
+                        frequency_penalty: OPENAI_QUERY_CONFIG.frequency_penalty,
+                        presence_penalty: OPENAI_QUERY_CONFIG.presence_penalty,
+                    },
+                    input: prompt,
+                });
+                const aiResponses = yield getAIResponse(prompt, generation);
+                if (aiResponses) {
+                    generation.end({
+                        output: aiResponses,
+                    });
+                    return createComments(file, aiResponses);
+                }
+                else {
+                    generation.end({
+                        output: null,
+                    });
+                    return [];
+                }
+            })));
+            // Flatten and add to comments
+            fileComments.forEach((commentArray) => {
+                comments.push(...commentArray);
+            });
+        })));
+        return comments;
+    });
+}
+// Function to create AI prompt
 function createPrompt(file, chunk, prDetails) {
-  return `Your task is to review pull requests. Instructions:
-- Provide the response in following JSON format:  {"reviews": [{"lineNumber":  <line_number>, "reviewComment": "<review comment>"}]}
+    return `Your task is to review pull requests. Instructions:
+- Provide the response in the following JSON format: {"reviews": [{"lineNumber": <line_number>, "reviewComment": "<review comment>"}]}
 - Do not give positive comments or compliments.
 - Provide comments and suggestions ONLY if there is something to improve, otherwise "reviews" should be an empty array.
 - Write the comment in GitHub Markdown format.
-- Use the given description only for the overall context and only comment the code.
+- Use the given description only for the overall context and only comment on the code.
 - IMPORTANT: NEVER suggest adding comments to the code.
 
-Review the following code diff in the file "${
-    file.to
-  }" and take the pull request title and description into account when writing the response.
-  
+Review the following code diff in the file "${file.to}" and take the pull request title and description into account when writing the response.
+
 Pull request title: ${prDetails.title}
 Pull request description:
 
@@ -179,141 +201,164 @@ Git diff to review:
 \`\`\`diff
 ${chunk.content}
 ${chunk.changes
-  // @ts-expect-error - ln and ln2 exists where needed
-  .map((c) => `${c.ln ? c.ln : c.ln2} ${c.content}`)
-  .join("\n")}
+        // @ts-expect-error - ln and ln2 exists where needed
+        .map((c) => `${c.ln ? c.ln : c.ln2} ${c.content}`)
+        .join("\n")}
 \`\`\`
 `;
 }
-function getAIResponse(prompt) {
-  var _a, _b;
-  return __awaiter(this, void 0, void 0, function* () {
-    const queryConfig = {
-      model: OPENAI_API_MODEL,
-      temperature: 0.2,
-      max_tokens: 700,
-      top_p: 1,
-      frequency_penalty: 0,
-      presence_penalty: 0,
-    };
-    try {
-      const response = yield openai.chat.completions.create(
-        Object.assign(Object.assign({}, queryConfig), {
-          response_format: { type: "json_object" },
-          messages: [
-            {
-              role: "system",
-              content: prompt,
-            },
-          ],
-        })
-      );
-      const res =
-        ((_b =
-          (_a = response.choices[0].message) === null || _a === void 0
-            ? void 0
-            : _a.content) === null || _b === void 0
-          ? void 0
-          : _b.trim()) || "{}";
-      return JSON.parse(res).reviews;
-    } catch (error) {
-      console.error("Error:", error);
-      return null;
-    }
-  });
+// Function to get AI response
+function getAIResponse(prompt, generation) {
+    var _a, _b;
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            const response = yield openai.chat.completions.create(Object.assign(Object.assign({}, OPENAI_QUERY_CONFIG), { messages: [
+                    {
+                        role: "user",
+                        content: prompt,
+                    },
+                ] }));
+            const aiContent = (_b = (_a = response.choices[0].message) === null || _a === void 0 ? void 0 : _a.content) === null || _b === void 0 ? void 0 : _b.trim();
+            if (!aiContent) {
+                console.warn("AI response is empty.");
+                return null;
+            }
+            console.log("AI response:", aiContent);
+            const parsed = JSON.parse(aiContent);
+            return parsed.reviews;
+        }
+        catch (error) {
+            console.error("Error fetching AI response:", error.message);
+            return null;
+        }
+    });
 }
-function createComment(file, chunk, aiResponses) {
-  return aiResponses.flatMap((aiResponse) => {
-    if (!file.to) {
-      return [];
-    }
-    return {
-      body: aiResponse.reviewComment,
-      path: file.to,
-      line: Number(aiResponse.lineNumber),
-    };
-  });
+// Function to create comments from AI responses
+function createComments(file, aiResponses) {
+    if (!file.to)
+        return [];
+    return aiResponses.map((aiResponse) => ({
+        body: aiResponse.reviewComment,
+        path: file.to || "",
+        line: Number(aiResponse.lineNumber),
+    }));
 }
+// Function to create review comments on GitHub
 function createReviewComment(owner, repo, pull_number, comments) {
-  return __awaiter(this, void 0, void 0, function* () {
-    yield octokit.pulls.createReview({
-      owner,
-      repo,
-      pull_number,
-      comments,
-      event: "COMMENT",
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            yield octokit.pulls.createReview({
+                owner,
+                repo,
+                pull_number,
+                comments,
+                event: "COMMENT",
+            });
+            console.log(`Created ${comments.length} review comment(s).`);
+        }
+        catch (error) {
+            throw new Error(`Failed to create review comments: ${error.message}`);
+        }
     });
-  });
 }
+// Main function orchestrating the workflow
 function main() {
-  var _a;
-  return __awaiter(this, void 0, void 0, function* () {
-    const prDetails = yield getPRDetails();
-    let diff;
-    const eventData = JSON.parse(
-      (0, fs_1.readFileSync)(
-        (_a = process.env.GITHUB_EVENT_PATH) !== null && _a !== void 0
-          ? _a
-          : "",
-        "utf8"
-      )
-    );
-    if (eventData.action === "opened") {
-      diff = yield getDiff(
-        prDetails.owner,
-        prDetails.repo,
-        prDetails.pull_number
-      );
-    } else if (eventData.action === "synchronize") {
-      const newBaseSha = eventData.before;
-      const newHeadSha = eventData.after;
-      const response = yield octokit.repos.compareCommits({
-        headers: {
-          accept: "application/vnd.github.v3.diff",
-        },
-        owner: prDetails.owner,
-        repo: prDetails.repo,
-        base: newBaseSha,
-        head: newHeadSha,
-      });
-      diff = String(response.data);
-    } else {
-      console.log("Unsupported event:", process.env.GITHUB_EVENT_NAME);
-      return;
-    }
-    if (!diff) {
-      console.log("No diff found");
-      return;
-    }
-    const parsedDiff = (0, parse_diff_1.default)(diff);
-    const excludePatterns = core
-      .getInput("exclude")
-      .split(",")
-      .map((s) => s.trim());
-    const filteredDiff = parsedDiff.filter((file) => {
-      return !excludePatterns.some((pattern) => {
-        var _a;
-        return (0, minimatch_1.default)(
-          (_a = file.to) !== null && _a !== void 0 ? _a : "",
-          pattern
-        );
-      });
+    return __awaiter(this, void 0, void 0, function* () {
+        let trace;
+        try {
+            const eventPath = process.env.GITHUB_EVENT_PATH;
+            if (!eventPath) {
+                throw new Error("GITHUB_EVENT_PATH is not defined.");
+            }
+            const eventDataRaw = (0, fs_1.readFileSync)(eventPath, "utf8");
+            const eventData = JSON.parse(eventDataRaw);
+            if (!eventData.action) {
+                throw new Error("Event action is not defined.");
+            }
+            // Only handle 'opened' and 'synchronize' actions
+            if (![ACTION_OPENED, ACTION_SYNCHRONIZE].includes(eventData.action)) {
+                console.log(`Unsupported event action: ${eventData.action}`);
+                return;
+            }
+            // Get PR details
+            const prDetails = yield getPRDetails(eventData);
+            // Initialize trace
+            trace = langfuse.trace({
+                name: "github-action-pr-review",
+                userId: prDetails.owner,
+                metadata: { repo: prDetails.repo, pull_number: prDetails.pull_number },
+                tags: ["github-action"],
+            });
+            // Get diff based on action
+            let diff;
+            if (eventData.action === ACTION_OPENED) {
+                diff = yield getDiff(prDetails.owner, prDetails.repo, prDetails.pull_number);
+            }
+            else if (eventData.action === ACTION_SYNCHRONIZE) {
+                if (!eventData.before || !eventData.after) {
+                    throw new Error("Both 'before' and 'after' SHAs are required for synchronize action.");
+                }
+                const response = yield octokit.repos.compareCommits({
+                    headers: {
+                        accept: "application/vnd.github.v3.diff",
+                    },
+                    owner: prDetails.owner,
+                    repo: prDetails.repo,
+                    base: eventData.before,
+                    head: eventData.after,
+                });
+                diff = String(response.data);
+            }
+            else {
+                // This else is redundant due to the earlier check but kept for safety
+                console.log("No diff found for unsupported action.");
+                return;
+            }
+            if (!diff) {
+                console.log("No diff found.");
+                return;
+            }
+            // Parse the diff
+            const parsedDiff = (0, parse_diff_1.default)(diff);
+            // Get exclude patterns
+            const excludePatternsInput = core.getInput(INPUT_EXCLUDE);
+            const excludePatterns = excludePatternsInput
+                ? excludePatternsInput.split(",").map((pattern) => pattern.trim())
+                : [];
+            // Filter out excluded files
+            const filteredDiff = parsedDiff.filter((file) => {
+                var _a;
+                const filePath = (_a = file.to) !== null && _a !== void 0 ? _a : "";
+                return !excludePatterns.some((pattern) => (0, minimatch_1.default)(filePath, pattern));
+            });
+            if (filteredDiff.length === 0) {
+                console.log("No files to analyze after applying exclude patterns.");
+                return;
+            }
+            // Analyze code to get comments
+            const comments = yield analyzeCode(filteredDiff, prDetails, trace);
+            if (comments.length > 0) {
+                yield createReviewComment(prDetails.owner, prDetails.repo, prDetails.pull_number, comments);
+            }
+            else {
+                console.log("No comments to post.");
+            }
+        }
+        catch (error) {
+            console.error("Error in main execution:", error.message);
+            core.setFailed(error.message);
+            process.exit(1);
+        }
+        finally {
+            // @ts-ignore
+            if (langfuse.enabled) {
+                yield langfuse.shutdownAsync();
+            }
+        }
     });
-    const comments = yield analyzeCode(filteredDiff, prDetails);
-    if (comments.length > 0) {
-      yield createReviewComment(
-        prDetails.owner,
-        prDetails.repo,
-        prDetails.pull_number,
-        comments
-      );
-    }
-  });
 }
-main().catch((error) => {
-  console.error("Error:", error);
-  process.exit(1);
-});
+// Execute the main function
+main();
 
 
 /***/ }),
@@ -6428,6 +6473,2407 @@ exports.isPlainObject = isPlainObject;
 
 /***/ }),
 
+/***/ 5102:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+var mustache = __nccwpck_require__(8272);
+
+class SimpleEventEmitter {
+  constructor() {
+    this.events = {};
+    this.events = {};
+  }
+  on(event, listener) {
+    if (!this.events[event]) {
+      this.events[event] = [];
+    }
+    this.events[event].push(listener);
+    return () => {
+      this.events[event] = this.events[event].filter(x => x !== listener);
+    };
+  }
+  emit(event, payload) {
+    for (const listener of this.events[event] || []) {
+      listener(payload);
+    }
+    for (const listener of this.events["*"] || []) {
+      listener(event, payload);
+    }
+  }
+}
+
+const DEFAULT_PROMPT_CACHE_TTL_SECONDS = 60;
+class LangfusePromptCacheItem {
+  constructor(value, ttlSeconds) {
+    this.value = value;
+    this._expiry = Date.now() + ttlSeconds * 1000;
+  }
+  get isExpired() {
+    return Date.now() > this._expiry;
+  }
+}
+class LangfusePromptCache {
+  constructor() {
+    this._cache = new Map();
+    this._defaultTtlSeconds = DEFAULT_PROMPT_CACHE_TTL_SECONDS;
+    this._refreshingKeys = new Map();
+  }
+  getIncludingExpired(key) {
+    return this._cache.get(key) ?? null;
+  }
+  set(key, value, ttlSeconds) {
+    const effectiveTtlSeconds = ttlSeconds ?? this._defaultTtlSeconds;
+    this._cache.set(key, new LangfusePromptCacheItem(value, effectiveTtlSeconds));
+  }
+  addRefreshingPromise(key, promise) {
+    this._refreshingKeys.set(key, promise);
+    promise.then(() => {
+      this._refreshingKeys.delete(key);
+    }).catch(() => {
+      this._refreshingKeys.delete(key);
+    });
+  }
+  isRefreshing(key) {
+    return this._refreshingKeys.has(key);
+  }
+}
+
+mustache.escape = function (text) {
+  return text;
+};
+class BasePromptClient {
+  constructor(prompt, isFallback = false, type) {
+    this.name = prompt.name;
+    this.version = prompt.version;
+    this.config = prompt.config;
+    this.labels = prompt.labels;
+    this.tags = prompt.tags;
+    this.isFallback = isFallback;
+    this.type = type;
+    this.prompt = prompt.prompt;
+  }
+  _transformToLangchainVariables(content) {
+    return content.replace(/\{\{(.*?)\}\}/g, "{$1}");
+  }
+  toJSON() {
+    return JSON.stringify({
+      name: this.name,
+      prompt: this.prompt,
+      version: this.version,
+      isFallback: this.isFallback,
+      tags: this.tags,
+      labels: this.labels,
+      type: this.type,
+      config: this.config
+    });
+  }
+}
+class TextPromptClient extends BasePromptClient {
+  constructor(prompt, isFallback = false) {
+    super(prompt, isFallback, "text");
+    this.promptResponse = prompt;
+    this.prompt = prompt.prompt;
+  }
+  compile(variables) {
+    return mustache.render(this.promptResponse.prompt, variables ?? {});
+  }
+  getLangchainPrompt() {
+    /**
+     * Converts Langfuse prompt into string compatible with Langchain PromptTemplate.
+     *
+     * It specifically adapts the mustache-style double curly braces {{variable}} used in Langfuse
+     * to the single curly brace {variable} format expected by Langchain.
+     *
+     * @returns {string} The string that can be plugged into Langchain's PromptTemplate.
+     */
+    return this._transformToLangchainVariables(this.prompt);
+  }
+}
+class ChatPromptClient extends BasePromptClient {
+  constructor(prompt, isFallback = false) {
+    super(prompt, isFallback, "chat");
+    this.promptResponse = prompt;
+    this.prompt = prompt.prompt;
+  }
+  compile(variables) {
+    return this.prompt.map(chatMessage => ({
+      ...chatMessage,
+      content: mustache.render(chatMessage.content, variables ?? {})
+    }));
+  }
+  getLangchainPrompt() {
+    /**
+     * Converts Langfuse prompt into string compatible with Langchain PromptTemplate.
+     *
+     * It specifically adapts the mustache-style double curly braces {{variable}} used in Langfuse
+     * to the single curly brace {variable} format expected by Langchain.
+     * Example usage:
+     *
+     * ```
+     * import { ChatPromptTemplate } from "@langchain/core/prompts";
+     *
+     * const langchainChatPrompt = ChatPromptTemplate.fromMessages(
+     *    langfuseChatPrompt.getLangchainPrompt().map((m) => [m.role, m.content])
+     *  );
+     *
+     * const formattedPrompt = await langchainPrompt.format(values);
+     *
+     * ```
+     * @returns {ChatMessage[]} Chat messages with variables that can be plugged into Langchain's ChatPromptTemplate.
+     */
+    return this.prompt.map(chatMessage => ({
+      ...chatMessage,
+      content: this._transformToLangchainVariables(chatMessage.content)
+    }));
+  }
+}
+
+function assert(truthyValue, message) {
+  if (!truthyValue) {
+    throw new Error(message);
+  }
+}
+function removeTrailingSlash(url) {
+  return url?.replace(/\/+$/, "");
+}
+async function retriable(fn, props = {}, log) {
+  const {
+    retryCount = 3,
+    retryDelay = 5000,
+    retryCheck = () => true
+  } = props;
+  let lastError = null;
+  for (let i = 0; i < retryCount + 1; i++) {
+    if (i > 0) {
+      // don't wait when it's the first try
+      await new Promise(resolve => setTimeout(resolve, retryDelay));
+      log(`Retrying ${i + 1} of ${retryCount + 1}`);
+    }
+    try {
+      const res = await fn();
+      return res;
+    } catch (e) {
+      lastError = e;
+      if (!retryCheck(e)) {
+        throw e;
+      }
+      log(`Retriable error: ${JSON.stringify(e)}`);
+    }
+  }
+  throw lastError;
+}
+// https://stackoverflow.com/a/8809472
+function generateUUID(globalThis) {
+  // Public Domain/MIT
+  let d = new Date().getTime(); //Timestamp
+  let d2 = globalThis && globalThis.performance && globalThis.performance.now && globalThis.performance.now() * 1000 || 0; //Time in microseconds since page-load or 0 if unsupported
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+    let r = Math.random() * 16; //random number between 0 and 16
+    if (d > 0) {
+      //Use timestamp until depleted
+      r = (d + r) % 16 | 0;
+      d = Math.floor(d / 16);
+    } else {
+      //Use microseconds since page-load if supported
+      r = (d2 + r) % 16 | 0;
+      d2 = Math.floor(d2 / 16);
+    }
+    return (c === "x" ? r : r & 0x3 | 0x8).toString(16);
+  });
+}
+function currentTimestamp() {
+  return new Date().getTime();
+}
+function currentISOTime() {
+  return new Date().toISOString();
+}
+function safeSetTimeout(fn, timeout) {
+  // NOTE: we use this so rarely that it is totally fine to do `safeSetTimeout(fn, 0)``
+  // rather than setImmediate.
+  const t = setTimeout(fn, timeout);
+  // We unref if available to prevent Node.js hanging on exit
+  t?.unref && t?.unref();
+  return t;
+}
+function getEnv(key) {
+  if (typeof process !== "undefined" && process.env[key]) {
+    return process.env[key];
+  } else if (typeof globalThis !== "undefined") {
+    return globalThis[key];
+  }
+  return;
+}
+function configLangfuseSDK(params, secretRequired = true) {
+  const {
+    publicKey,
+    secretKey,
+    ...coreOptions
+  } = params ?? {};
+  // check environment variables if values not provided
+  const finalPublicKey = publicKey ?? getEnv("LANGFUSE_PUBLIC_KEY");
+  const finalSecretKey = secretRequired ? secretKey ?? getEnv("LANGFUSE_SECRET_KEY") : undefined;
+  const finalBaseUrl = coreOptions.baseUrl ?? getEnv("LANGFUSE_BASEURL");
+  const finalCoreOptions = {
+    ...coreOptions,
+    baseUrl: finalBaseUrl
+  };
+  return {
+    publicKey: finalPublicKey,
+    ...(secretRequired ? {
+      secretKey: finalSecretKey
+    } : undefined),
+    ...finalCoreOptions
+  };
+}
+const encodeQueryParams = params => {
+  const queryParams = new URLSearchParams();
+  Object.entries(params ?? {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      // check for date
+      if (value instanceof Date) {
+        queryParams.append(key, value.toISOString());
+      } else {
+        queryParams.append(key, value.toString());
+      }
+    }
+  });
+  return queryParams.toString();
+};
+
+var utils = /*#__PURE__*/Object.freeze({
+  __proto__: null,
+  assert: assert,
+  configLangfuseSDK: configLangfuseSDK,
+  currentISOTime: currentISOTime,
+  currentTimestamp: currentTimestamp,
+  encodeQueryParams: encodeQueryParams,
+  generateUUID: generateUUID,
+  getEnv: getEnv,
+  removeTrailingSlash: removeTrailingSlash,
+  retriable: retriable,
+  safeSetTimeout: safeSetTimeout
+});
+
+const common_release_envs = [
+// Vercel
+"VERCEL_GIT_COMMIT_SHA", "NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA",
+// Netlify
+"COMMIT_REF",
+// Render
+"RENDER_GIT_COMMIT",
+// GitLab CI
+"CI_COMMIT_SHA",
+// CicleCI
+"CIRCLE_SHA1",
+// Cloudflare pages
+"CF_PAGES_COMMIT_SHA",
+// AWS Amplify
+"REACT_APP_GIT_SHA",
+// Heroku
+"SOURCE_VERSION"];
+function getCommonReleaseEnvs() {
+  for (const key of common_release_envs) {
+    const value = getEnv(key);
+    if (value) {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+exports.LangfusePersistedProperty = void 0;
+(function (LangfusePersistedProperty) {
+  LangfusePersistedProperty["Props"] = "props";
+  LangfusePersistedProperty["Queue"] = "queue";
+  LangfusePersistedProperty["OptedOut"] = "opted_out";
+})(exports.LangfusePersistedProperty || (exports.LangfusePersistedProperty = {}));
+
+let fs = null;
+let cryptoModule = null;
+if (typeof process !== "undefined" && process.versions?.node) {
+  // Node
+  try {
+    fs = __nccwpck_require__(7147);
+    cryptoModule = __nccwpck_require__(6113);
+  } catch (error) {
+    console.error("Error loading crypto or fs module", error);
+  }
+} else if (typeof crypto !== "undefined") {
+  // Edge Runtime, Cloudflare Workers, etc.
+  cryptoModule = crypto;
+}
+/**
+ * A class for wrapping media objects for upload to Langfuse.
+ *
+ * This class handles the preparation and formatting of media content for Langfuse,
+ * supporting both base64 data URIs and raw content bytes.
+ */
+class LangfuseMedia {
+  constructor(params) {
+    const {
+      obj,
+      base64DataUri,
+      contentType,
+      contentBytes,
+      filePath
+    } = params;
+    this.obj = obj;
+    this._mediaId = undefined;
+    if (base64DataUri) {
+      const [contentBytesParsed, contentTypeParsed] = this.parseBase64DataUri(base64DataUri);
+      this._contentBytes = contentBytesParsed;
+      this._contentType = contentTypeParsed;
+      this._source = "base64_data_uri";
+    } else if (contentBytes && contentType) {
+      this._contentBytes = contentBytes;
+      this._contentType = contentType;
+      this._source = "bytes";
+    } else if (filePath && contentType) {
+      if (!fs) {
+        throw new Error("File system support is not available in this environment");
+      }
+      if (!fs.existsSync(filePath)) {
+        throw new Error(`File at path ${filePath} does not exist`);
+      }
+      this._contentBytes = this.readFile(filePath);
+      this._contentType = this._contentBytes ? contentType : undefined;
+      this._source = this._contentBytes ? "file" : undefined;
+    } else {
+      console.error("base64DataUri, or contentBytes and contentType, or filePath must be provided to LangfuseMedia");
+    }
+  }
+  readFile(filePath) {
+    try {
+      if (!fs) {
+        throw new Error("File system support is not available in this environment");
+      }
+      return fs.readFileSync(filePath);
+    } catch (error) {
+      console.error(`Error reading file at path ${filePath}`, error);
+      return undefined;
+    }
+  }
+  parseBase64DataUri(data) {
+    try {
+      if (!data || typeof data !== "string") {
+        throw new Error("Data URI is not a string");
+      }
+      if (!data.startsWith("data:")) {
+        throw new Error("Data URI does not start with 'data:'");
+      }
+      const [header, actualData] = data.slice(5).split(",", 2);
+      if (!header || !actualData) {
+        throw new Error("Invalid URI");
+      }
+      const headerParts = header.split(";");
+      if (!headerParts.includes("base64")) {
+        throw new Error("Data is not base64 encoded");
+      }
+      const contentType = headerParts[0];
+      if (!contentType) {
+        throw new Error("Content type is empty");
+      }
+      return [Buffer.from(actualData, "base64"), contentType];
+    } catch (error) {
+      console.error("Error parsing base64 data URI", error);
+      return [undefined, undefined];
+    }
+  }
+  get contentLength() {
+    return this._contentBytes?.length;
+  }
+  get contentSha256Hash() {
+    if (!this._contentBytes) {
+      return undefined;
+    }
+    if (!cryptoModule) {
+      console.error("Crypto support is not available in this environment");
+      return undefined;
+    }
+    const sha256Hash = cryptoModule.createHash("sha256").update(this._contentBytes).digest("base64");
+    return sha256Hash;
+  }
+  toJSON() {
+    if (!this._contentType || !this._source || !this._mediaId) {
+      return `<Upload handling failed for LangfuseMedia of type ${this._contentType}>`;
+    }
+    return `@@@langfuseMedia:type=${this._contentType}|id=${this._mediaId}|source=${this._source}@@@`;
+  }
+  /**
+   * Parses a media reference string into a ParsedMediaReference.
+   *
+   * Example reference string:
+   *     "@@@langfuseMedia:type=image/jpeg|id=some-uuid|source=base64DataUri@@@"
+   *
+   * @param referenceString - The reference string to parse.
+   * @returns An object with the mediaId, source, and contentType.
+   *
+   * @throws Error if the reference string is invalid or missing required fields.
+   */
+  static parseReferenceString(referenceString) {
+    const prefix = "@@@langfuseMedia:";
+    const suffix = "@@@";
+    if (!referenceString.startsWith(prefix)) {
+      throw new Error("Reference string does not start with '@@@langfuseMedia:type='");
+    }
+    if (!referenceString.endsWith(suffix)) {
+      throw new Error("Reference string does not end with '@@@'");
+    }
+    const content = referenceString.slice(prefix.length, -suffix.length);
+    const pairs = content.split("|");
+    const parsedData = {};
+    for (const pair of pairs) {
+      const [key, value] = pair.split("=", 2);
+      parsedData[key] = value;
+    }
+    if (!("type" in parsedData && "id" in parsedData && "source" in parsedData)) {
+      throw new Error("Missing required fields in reference string");
+    }
+    return {
+      mediaId: parsedData["id"],
+      source: parsedData["source"],
+      contentType: parsedData["type"]
+    };
+  }
+}
+
+class LangfuseMemoryStorage {
+  constructor() {
+    this._memoryStorage = {};
+  }
+  getProperty(key) {
+    return this._memoryStorage[key];
+  }
+  setProperty(key, value) {
+    this._memoryStorage[key] = value !== null ? value : undefined;
+  }
+}
+
+const MAX_EVENT_SIZE = 1_000_000;
+class LangfuseFetchHttpError extends Error {
+  constructor(response, body) {
+    super("HTTP error while fetching Langfuse: " + response.status + " and body: " + body);
+    this.response = response;
+    this.name = "LangfuseFetchHttpError";
+  }
+}
+class LangfuseFetchNetworkError extends Error {
+  constructor(error) {
+    super("Network error while fetching Langfuse", error instanceof Error ? {
+      cause: error
+    } : {});
+    this.error = error;
+    this.name = "LangfuseFetchNetworkError";
+  }
+}
+function isLangfuseFetchHttpError(error) {
+  return typeof error === "object" && error.name === "LangfuseFetchHttpError";
+}
+function isLangfuseFetchNetworkError(error) {
+  return typeof error === "object" && error.name === "LangfuseFetchNetworkError";
+}
+function isLangfuseFetchError(err) {
+  return isLangfuseFetchHttpError(err) || isLangfuseFetchNetworkError(err);
+}
+// Constants for URLs
+const SUPPORT_URL = "https://langfuse.com/support";
+const API_DOCS_URL = "https://api.reference.langfuse.com";
+const RBAC_DOCS_URL = "https://langfuse.com/docs/rbac";
+const INSTALLATION_DOCS_URL = "https://langfuse.com/docs/sdk/typescript/guide";
+const RATE_LIMITS_URL = "https://langfuse.com/faq/all/api-limits";
+const NPM_PACKAGE_URL = "https://www.npmjs.com/package/langfuse";
+// Error messages
+const updatePromptResponse = `Make sure to keep your SDK updated, refer to ${NPM_PACKAGE_URL} for details.`;
+const defaultServerErrorPrompt = `This is an unusual occurrence and we are monitoring it closely. For help, please contact support: ${SUPPORT_URL}.`;
+const defaultErrorResponse = `Unexpected error occurred. Please check your request and contact support: ${SUPPORT_URL}.`;
+// Error response map
+const errorResponseByCode = new Map([
+// Internal error category: 5xx errors, 404 error
+[500, `Internal server error occurred. For help, please contact support: ${SUPPORT_URL}`], [501, `Not implemented. Please check your request and contact support for help: ${SUPPORT_URL}.`], [502, `Bad gateway. ${defaultServerErrorPrompt}`], [503, `Service unavailable. ${defaultServerErrorPrompt}`], [504, `Gateway timeout. ${defaultServerErrorPrompt}`], [404, `Internal error occurred. ${defaultServerErrorPrompt}`],
+// Client error category: 4xx errors, excluding 404
+[400, `Bad request. Please check your request for any missing or incorrect parameters. Refer to our API docs: ${API_DOCS_URL} for details.`], [401, `Unauthorized. Please check your public/private host settings. Refer to our installation and setup guide: ${INSTALLATION_DOCS_URL} for details on SDK configuration.`], [403, `Forbidden. Please check your access control settings. Refer to our RBAC docs: ${RBAC_DOCS_URL} for details.`], [429, `Rate limit exceeded. For more information on rate limits please see: ${RATE_LIMITS_URL}`]]);
+// Returns a user-friendly error message based on the HTTP status code
+function getErrorResponseByCode(code) {
+  if (!code) {
+    return `${defaultErrorResponse} ${updatePromptResponse}`;
+  }
+  const errorResponse = errorResponseByCode.get(code) || defaultErrorResponse;
+  return `${code}: ${errorResponse} ${updatePromptResponse}`;
+}
+function logIngestionError(error) {
+  if (isLangfuseFetchHttpError(error)) {
+    const code = error.response.status;
+    const errorResponse = getErrorResponseByCode(code);
+    console.error("[Langfuse SDK]", errorResponse, `Error details: ${error}`);
+  } else if (isLangfuseFetchNetworkError(error)) {
+    console.error("[Langfuse SDK] Network error: ", error);
+  } else {
+    console.error("[Langfuse SDK] Unknown error:", error);
+  }
+}
+class LangfuseCoreStateless {
+  constructor(params) {
+    this.additionalHeaders = {};
+    this.debugMode = false;
+    this.pendingEventProcessingPromises = {};
+    this.pendingIngestionPromises = {};
+    this.localEventExportMap = new Map();
+    // internal
+    this._events = new SimpleEventEmitter();
+    const {
+      publicKey,
+      secretKey,
+      enabled,
+      _projectId,
+      _isLocalEventExportEnabled,
+      ...options
+    } = params;
+    this.enabled = enabled === false ? false : true;
+    this.publicKey = publicKey ?? "";
+    this.secretKey = secretKey;
+    this.baseUrl = removeTrailingSlash(options?.baseUrl || "https://cloud.langfuse.com");
+    this.additionalHeaders = options?.additionalHeaders || {};
+    this.flushAt = options?.flushAt ? Math.max(options?.flushAt, 1) : 15;
+    this.flushInterval = options?.flushInterval ?? 10000;
+    this.release = options?.release ?? getEnv("LANGFUSE_RELEASE") ?? getCommonReleaseEnvs() ?? undefined;
+    this.mask = options?.mask;
+    this._retryOptions = {
+      retryCount: options?.fetchRetryCount ?? 3,
+      retryDelay: options?.fetchRetryDelay ?? 3000,
+      retryCheck: isLangfuseFetchError
+    };
+    this.requestTimeout = options?.requestTimeout ?? 10000; // 10 seconds
+    this.sdkIntegration = options?.sdkIntegration ?? "DEFAULT";
+    this.isLocalEventExportEnabled = _isLocalEventExportEnabled ?? false;
+    if (this.isLocalEventExportEnabled && !_projectId) {
+      this._events.emit("error", "Local event export is enabled, but no project ID was provided. Disabling local export.");
+      this.isLocalEventExportEnabled = false;
+      return;
+    } else if (!this.isLocalEventExportEnabled && _projectId) {
+      this._events.emit("error", "Local event export is disabled, but a project ID was provided. Disabling local export.");
+      this.isLocalEventExportEnabled = false;
+      return;
+    } else {
+      this.projectId = _projectId;
+    }
+  }
+  getSdkIntegration() {
+    return this.sdkIntegration;
+  }
+  getCommonEventProperties() {
+    return {
+      $lib: this.getLibraryId(),
+      $lib_version: this.getLibraryVersion()
+    };
+  }
+  on(event, cb) {
+    return this._events.on(event, cb);
+  }
+  debug(enabled = true) {
+    this.removeDebugCallback?.();
+    this.debugMode = enabled;
+    if (enabled) {
+      this.removeDebugCallback = this.on("*", (event, payload) => console.log("Langfuse Debug", event, JSON.stringify(payload)));
+    }
+  }
+  /***
+   *** Handlers for each object type
+   ***/
+  traceStateless(body) {
+    const {
+      id: bodyId,
+      timestamp: bodyTimestamp,
+      release: bodyRelease,
+      ...rest
+    } = body;
+    const id = bodyId ?? generateUUID();
+    const release = bodyRelease ?? this.release;
+    const parsedBody = {
+      id,
+      release,
+      timestamp: bodyTimestamp ?? new Date(),
+      ...rest
+    };
+    this.enqueue("trace-create", parsedBody);
+    return id;
+  }
+  eventStateless(body) {
+    const {
+      id: bodyId,
+      startTime: bodyStartTime,
+      ...rest
+    } = body;
+    const id = bodyId ?? generateUUID();
+    const parsedBody = {
+      id,
+      startTime: bodyStartTime ?? new Date(),
+      ...rest
+    };
+    this.enqueue("event-create", parsedBody);
+    return id;
+  }
+  spanStateless(body) {
+    const {
+      id: bodyId,
+      startTime: bodyStartTime,
+      ...rest
+    } = body;
+    const id = bodyId || generateUUID();
+    const parsedBody = {
+      id,
+      startTime: bodyStartTime ?? new Date(),
+      ...rest
+    };
+    this.enqueue("span-create", parsedBody);
+    return id;
+  }
+  generationStateless(body) {
+    const {
+      id: bodyId,
+      startTime: bodyStartTime,
+      prompt,
+      ...rest
+    } = body;
+    const promptDetails = prompt && !prompt.isFallback ? {
+      promptName: prompt.name,
+      promptVersion: prompt.version
+    } : {};
+    const id = bodyId || generateUUID();
+    const parsedBody = {
+      id,
+      startTime: bodyStartTime ?? new Date(),
+      ...promptDetails,
+      ...rest
+    };
+    this.enqueue("generation-create", parsedBody);
+    return id;
+  }
+  scoreStateless(body) {
+    const {
+      id: bodyId,
+      ...rest
+    } = body;
+    const id = bodyId || generateUUID();
+    const parsedBody = {
+      id,
+      ...rest
+    };
+    this.enqueue("score-create", parsedBody);
+    return id;
+  }
+  updateSpanStateless(body) {
+    this.enqueue("span-update", body);
+    return body.id;
+  }
+  updateGenerationStateless(body) {
+    const {
+      prompt,
+      ...rest
+    } = body;
+    const promptDetails = prompt && !prompt.isFallback ? {
+      promptName: prompt.name,
+      promptVersion: prompt.version
+    } : {};
+    const parsedBody = {
+      ...promptDetails,
+      ...rest
+    };
+    this.enqueue("generation-update", parsedBody);
+    return body.id;
+  }
+  async _getDataset(name) {
+    const encodedName = encodeURIComponent(name);
+    return this.fetchAndLogErrors(`${this.baseUrl}/api/public/v2/datasets/${encodedName}`, this._getFetchOptions({
+      method: "GET"
+    }));
+  }
+  async _getDatasetItems(query) {
+    const params = new URLSearchParams();
+    Object.entries(query ?? {}).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        params.append(key, value.toString());
+      }
+    });
+    return this.fetchAndLogErrors(`${this.baseUrl}/api/public/dataset-items?${params}`, this._getFetchOptions({
+      method: "GET"
+    }));
+  }
+  async fetchTraces(query) {
+    // destructure the response into data and meta to be explicit about the shape of the response and add type-warnings in case the API changes
+    const {
+      data,
+      meta
+    } = await this.fetchAndLogErrors(`${this.baseUrl}/api/public/traces?${encodeQueryParams(query)}`, this._getFetchOptions({
+      method: "GET"
+    }));
+    return {
+      data,
+      meta
+    };
+  }
+  async fetchTrace(traceId) {
+    const res = await this.fetchAndLogErrors(`${this.baseUrl}/api/public/traces/${traceId}`, this._getFetchOptions({
+      method: "GET"
+    }));
+    return {
+      data: res
+    };
+  }
+  async fetchObservations(query) {
+    // destructure the response into data and meta to be explicit about the shape of the response and add type-warnings in case the API changes
+    const {
+      data,
+      meta
+    } = await this.fetchAndLogErrors(`${this.baseUrl}/api/public/observations?${encodeQueryParams(query)}`, this._getFetchOptions({
+      method: "GET"
+    }));
+    return {
+      data,
+      meta
+    };
+  }
+  async fetchObservation(observationId) {
+    const res = await this.fetchAndLogErrors(`${this.baseUrl}/api/public/observations/${observationId}`, this._getFetchOptions({
+      method: "GET"
+    }));
+    return {
+      data: res
+    };
+  }
+  async fetchSessions(query) {
+    // destructure the response into data and meta to be explicit about the shape of the response and add type-warnings in case the API changes
+    const {
+      data,
+      meta
+    } = await this.fetchAndLogErrors(`${this.baseUrl}/api/public/sessions?${encodeQueryParams(query)}`, this._getFetchOptions({
+      method: "GET"
+    }));
+    return {
+      data,
+      meta
+    };
+  }
+  async getDatasetRun(params) {
+    const encodedDatasetName = encodeURIComponent(params.datasetName);
+    const encodedRunName = encodeURIComponent(params.runName);
+    return this.fetchAndLogErrors(`${this.baseUrl}/api/public/datasets/${encodedDatasetName}/runs/${encodedRunName}`, this._getFetchOptions({
+      method: "GET"
+    }));
+  }
+  async getDatasetRuns(datasetName, query) {
+    return this.fetchAndLogErrors(`${this.baseUrl}/api/public/datasets/${encodeURIComponent(datasetName)}/runs?${encodeQueryParams(query)}`, this._getFetchOptions({
+      method: "GET"
+    }));
+  }
+  async createDatasetRunItem(body) {
+    return this.fetchAndLogErrors(`${this.baseUrl}/api/public/dataset-run-items`, this._getFetchOptions({
+      method: "POST",
+      body: JSON.stringify(body)
+    }));
+  }
+  /**
+   * Creates a dataset. Upserts the dataset if it already exists.
+   *
+   * @param dataset Can be either a string (name) or an object with name, description and metadata
+   * @returns A promise that resolves to the response of the create operation.
+   */
+  async createDataset(dataset) {
+    const body = typeof dataset === "string" ? {
+      name: dataset
+    } : dataset;
+    return this.fetchAndLogErrors(`${this.baseUrl}/api/public/datasets`, this._getFetchOptions({
+      method: "POST",
+      body: JSON.stringify(body)
+    }));
+  }
+  /**
+   * Creates a dataset item. Upserts the item if it already exists.
+   * @param body The body of the dataset item to be created.
+   * @returns A promise that resolves to the response of the create operation.
+   */
+  async createDatasetItem(body) {
+    return this.fetchAndLogErrors(`${this.baseUrl}/api/public/dataset-items`, this._getFetchOptions({
+      method: "POST",
+      body: JSON.stringify(body)
+    }));
+  }
+  async getDatasetItem(id) {
+    return this.fetchAndLogErrors(`${this.baseUrl}/api/public/dataset-items/${id}`, this._getFetchOptions({
+      method: "GET"
+    }));
+  }
+  _parsePayload(response) {
+    try {
+      return JSON.parse(response);
+    } catch {
+      return response;
+    }
+  }
+  async createPromptStateless(body) {
+    return this.fetchAndLogErrors(`${this.baseUrl}/api/public/v2/prompts`, this._getFetchOptions({
+      method: "POST",
+      body: JSON.stringify(body)
+    }));
+  }
+  async getPromptStateless(name, version, label, maxRetries, requestTimeout // this will override the default requestTimeout for fetching prompts. Together with maxRetries, it can be used to fetch prompts fast when the first fetch is slow.
+  ) {
+    const encodedName = encodeURIComponent(name);
+    const params = new URLSearchParams();
+    // Add parameters only if they are provided
+    if (version && label) {
+      throw new Error("Provide either version or label, not both.");
+    }
+    if (version) {
+      params.append("version", version.toString());
+    }
+    if (label) {
+      params.append("label", label);
+    }
+    const url = `${this.baseUrl}/api/public/v2/prompts/${encodedName}${params.size ? "?" + params : ""}`;
+    const boundedMaxRetries = this._getBoundedMaxRetries({
+      maxRetries,
+      defaultMaxRetries: 2,
+      maxRetriesUpperBound: 4
+    });
+    const retryOptions = {
+      ...this._retryOptions,
+      retryCount: boundedMaxRetries,
+      retryDelay: 500
+    };
+    const retryLogger = string => this._events.emit("retry", string + ", " + url + ", " + JSON.stringify(retryOptions));
+    return retriable(async () => {
+      const res = await this.fetch(url, this._getFetchOptions({
+        method: "GET",
+        fetchTimeout: requestTimeout
+      })).catch(e => {
+        if (e.name === "AbortError") {
+          throw new LangfuseFetchNetworkError("Fetch request timed out");
+        }
+        throw new LangfuseFetchNetworkError(e);
+      });
+      const data = await res.json();
+      if (res.status >= 500) {
+        throw new LangfuseFetchHttpError(res, JSON.stringify(data));
+      }
+      return {
+        fetchResult: res.status === 200 ? "success" : "failure",
+        data
+      };
+    }, retryOptions, retryLogger);
+  }
+  _getBoundedMaxRetries(params) {
+    const defaultMaxRetries = Math.max(params.defaultMaxRetries ?? 2, 0);
+    const maxRetriesUpperBound = Math.max(params.maxRetriesUpperBound ?? 4, 0);
+    if (params.maxRetries === undefined) {
+      return defaultMaxRetries;
+    }
+    return Math.min(Math.max(params.maxRetries, 0), maxRetriesUpperBound);
+  }
+  /***
+   *** QUEUEING AND FLUSHING
+   ***/
+  enqueue(type, body) {
+    if (!this.enabled) {
+      return;
+    }
+    const promise = this.processEnqueueEvent(type, body);
+    const promiseId = generateUUID();
+    this.pendingEventProcessingPromises[promiseId] = promise;
+    promise.catch(e => {
+      this._events.emit("error", e);
+    }).finally(() => {
+      delete this.pendingEventProcessingPromises[promiseId];
+    });
+  }
+  async processEnqueueEvent(type, body) {
+    this.maskEventBodyInPlace(body);
+    await this.processMediaInEvent(type, body);
+    const finalEventBody = this.truncateEventBody(body, MAX_EVENT_SIZE);
+    try {
+      JSON.stringify(finalEventBody);
+    } catch (e) {
+      this._events.emit("error", `[Langfuse SDK] Event Body for ${type} is not JSON-serializable: ${e}`);
+      return;
+    }
+    const queue = this.getPersistedProperty(exports.LangfusePersistedProperty.Queue) || [];
+    queue.push({
+      id: generateUUID(),
+      type,
+      timestamp: currentISOTime(),
+      body: finalEventBody,
+      // TODO: fix typecast. EventBody is not correctly narrowed to the correct type dictated by the 'type' property. This should be part of a larger type cleanup.
+      metadata: undefined
+    });
+    this.setPersistedProperty(exports.LangfusePersistedProperty.Queue, queue);
+    this._events.emit(type, finalEventBody);
+    // Flush queued events if we meet the flushAt length
+    if (queue.length >= this.flushAt) {
+      this.flush();
+    }
+    if (this.flushInterval && !this._flushTimer) {
+      this._flushTimer = safeSetTimeout(() => this.flush(), this.flushInterval);
+    }
+  }
+  maskEventBodyInPlace(body) {
+    if (!this.mask) {
+      return;
+    }
+    const maskableKeys = ["input", "output"];
+    for (const key of maskableKeys) {
+      if (key in body) {
+        try {
+          body[key] = this.mask({
+            data: body[key]
+          });
+        } catch (e) {
+          this._events.emit("error", `Error masking ${key}: ${e}`);
+          body[key] = "<fully masked due to failed mask function>";
+        }
+      }
+    }
+  }
+  /**
+   * Truncates the event body if its byte size exceeds the specified maximum byte size.
+   * Emits a warning event if truncation occurs.
+   * The fields that may be truncated are: "input", "output", and "metadata".
+   * The fields are truncated in the order of their size, from largest to smallest until the total byte size is within the limit.
+   */
+  truncateEventBody(body, maxByteSize) {
+    const bodySize = this.getByteSize(body);
+    if (bodySize <= maxByteSize) {
+      return body;
+    }
+    this._events.emit("warning", `Event Body is too large (${bodySize} bytes) and will be truncated`);
+    // Sort keys by size and truncate the largest keys first
+    const keysToCheck = ["input", "output", "metadata"];
+    const keySizes = keysToCheck.map(key => ({
+      key,
+      size: key in body ? this.getByteSize(body[key]) : 0
+    })).sort((a, b) => b.size - a.size);
+    let result = {
+      ...body
+    };
+    let currentSize = bodySize;
+    for (const {
+      key,
+      size
+    } of keySizes) {
+      if (currentSize > maxByteSize && Object.prototype.hasOwnProperty.call(result, key)) {
+        result = {
+          ...result,
+          [key]: "<truncated due to size exceeding limit>"
+        };
+        this._events.emit("warning", `Truncated ${key} due to total size exceeding limit`);
+        currentSize -= size;
+      }
+    }
+    return result;
+  }
+  getByteSize(obj) {
+    const serialized = JSON.stringify(obj);
+    // Use TextEncoder if available, otherwise fallback to encodeURIComponent
+    if (typeof TextEncoder !== "undefined") {
+      return new TextEncoder().encode(serialized).length;
+    } else {
+      return encodeURIComponent(serialized).replace(/%[A-F\d]{2}/g, "U").length;
+    }
+  }
+  async processMediaInEvent(type, body) {
+    if (!body) {
+      return;
+    }
+    const traceId = "traceId" in body ? body.traceId : type.includes("trace") ? body.id : undefined;
+    if (!traceId) {
+      this._events.emit("warning", "traceId is required for media upload");
+      return;
+    }
+    const observationId = (type.includes("generation") || type.includes("span")) && body.id ? body.id : undefined;
+    await Promise.all(["input", "output", "metadata"].map(async field => {
+      if (body[field]) {
+        body[field] = (await this.findAndProcessMedia({
+          data: body[field],
+          traceId,
+          observationId,
+          field
+        }).catch(e => {
+          this._events.emit("error", `Error processing multimodal event: ${e}`);
+        })) ?? body[field];
+      }
+    }));
+  }
+  async findAndProcessMedia({
+    data,
+    traceId,
+    observationId,
+    field
+  }) {
+    const seenObjects = new WeakMap();
+    const maxLevels = 10;
+    const processRecursively = async (data, level) => {
+      if (typeof data === "string" && data.startsWith("data:")) {
+        const media = new LangfuseMedia({
+          base64DataUri: data
+        });
+        await this.processMediaItem({
+          media,
+          traceId,
+          observationId,
+          field
+        });
+        return media;
+      }
+      if (typeof data !== "object" || data === null) {
+        return data;
+      }
+      // Use WeakMap to detect cycles
+      if (seenObjects.has(data) || level > maxLevels) {
+        return data;
+      }
+      seenObjects.set(data, true);
+      if (data instanceof LangfuseMedia || Object.prototype.toString.call(data) === "[object LangfuseMedia]") {
+        await this.processMediaItem({
+          media: data,
+          traceId,
+          observationId,
+          field
+        });
+        return data;
+      }
+      if (Array.isArray(data)) {
+        return await Promise.all(data.map(item => processRecursively(item, level + 1)));
+      }
+      // Parse OpenAI input audio data which is passed as base64 string NOT in the data uri format
+      if (typeof data === "object" && data !== null) {
+        if ("input_audio" in data && typeof data["input_audio"] === "object" && "data" in data.input_audio) {
+          const media = new LangfuseMedia({
+            base64DataUri: `data:audio/${data.input_audio["format"] || "wav"};base64,${data.input_audio.data}`
+          });
+          await this.processMediaItem({
+            media,
+            traceId,
+            observationId,
+            field
+          });
+          return {
+            ...data,
+            input_audio: {
+              ...data.input_audio,
+              data: media
+            }
+          };
+        }
+        // OpenAI output audio data is passed as base64 string NOT in the data uri format
+        if ("audio" in data && typeof data["audio"] === "object" && "data" in data.audio) {
+          const media = new LangfuseMedia({
+            base64DataUri: `data:audio/${data.audio["format"] || "wav"};base64,${data.audio.data}`
+          });
+          await this.processMediaItem({
+            media,
+            traceId,
+            observationId,
+            field
+          });
+          return {
+            ...data,
+            audio: {
+              ...data.audio,
+              data: media
+            }
+          };
+        }
+        // Recursively process nested objects
+        return Object.fromEntries(await Promise.all(Object.entries(data).map(async ([key, value]) => [key, await processRecursively(value, level + 1)])));
+      }
+      return data;
+    };
+    return await processRecursively(data, 1);
+  }
+  async processMediaItem({
+    media,
+    traceId,
+    observationId,
+    field
+  }) {
+    try {
+      if (!media.contentLength || !media._contentType || !media.contentSha256Hash || !media._contentBytes) {
+        return;
+      }
+      const getUploadUrlBody = {
+        contentLength: media.contentLength,
+        traceId,
+        observationId,
+        field,
+        contentType: media._contentType,
+        sha256Hash: media.contentSha256Hash
+      };
+      const fetchResponse = await this.fetch(`${this.baseUrl}/api/public/media`, this._getFetchOptions({
+        method: "POST",
+        body: JSON.stringify(getUploadUrlBody)
+      }));
+      const uploadUrlResponse = await fetchResponse.json();
+      const {
+        uploadUrl,
+        mediaId
+      } = uploadUrlResponse;
+      media._mediaId = mediaId;
+      if (uploadUrl) {
+        this._events.emit("debug", `Uploading media ${mediaId}`);
+        const startTime = Date.now();
+        const uploadResponse = await this.fetch(uploadUrl, {
+          method: "PUT",
+          body: media._contentBytes,
+          headers: {
+            "Content-Type": media._contentType,
+            "x-amz-checksum-sha256": media.contentSha256Hash,
+            "x-ms-blob-type": "BlockBlob"
+          }
+        });
+        const patchMediaBody = {
+          uploadedAt: new Date().toISOString(),
+          uploadHttpStatus: uploadResponse.status,
+          uploadHttpError: await uploadResponse.text(),
+          uploadTimeMs: Date.now() - startTime
+        };
+        await this.fetch(`${this.baseUrl}/api/public/media/${mediaId}`, this._getFetchOptions({
+          method: "PATCH",
+          body: JSON.stringify(patchMediaBody)
+        }));
+        this._events.emit("debug", `Media upload status reported for ${mediaId}`);
+      } else {
+        this._events.emit("debug", `Media ${mediaId} already uploaded`);
+      }
+    } catch (err) {
+      this._events.emit("error", `Error processing media item: ${err}`);
+    }
+  }
+  /**
+   * Asynchronously flushes all events that are not yet sent to the server.
+   * This function always resolves, even if there were errors when flushing.
+   * Errors are emitted as "error" events and the promise resolves.
+   *
+   * @returns {Promise<void>} A promise that resolves when the flushing is completed.
+   */
+  async flushAsync() {
+    await Promise.all(Object.values(this.pendingEventProcessingPromises)).catch(e => {
+      logIngestionError(e);
+    });
+    return new Promise((resolve, _reject) => {
+      try {
+        this.flush((err, data) => {
+          if (err) {
+            logIngestionError(err);
+            resolve();
+          } else {
+            resolve(data);
+          }
+        });
+        // safeguard against unexpected synchronous errors
+      } catch (e) {
+        console.error("[Langfuse SDK] Error while flushing Langfuse", e);
+      }
+    });
+  }
+  // Flushes all events that are not yet sent to the server
+  flush(callback) {
+    if (this._flushTimer) {
+      clearTimeout(this._flushTimer);
+      this._flushTimer = null;
+    }
+    const queue = this.getPersistedProperty(exports.LangfusePersistedProperty.Queue) || [];
+    if (!queue.length) {
+      return callback?.();
+    }
+    const items = queue.splice(0, this.flushAt);
+    this.setPersistedProperty(exports.LangfusePersistedProperty.Queue, queue);
+    const MAX_MSG_SIZE = 1_000_000;
+    const BATCH_SIZE_LIMIT = 2_500_000;
+    this.processQueueItems(items, MAX_MSG_SIZE, BATCH_SIZE_LIMIT);
+    const promiseUUID = generateUUID();
+    const done = err => {
+      if (err) {
+        this._events.emit("error", err);
+      }
+      callback?.(err, items);
+      this._events.emit("flush", items);
+    };
+    // If local event export is enabled, we don't send the events to the server, but instead store them in the localEventExportMap
+    if (this.isLocalEventExportEnabled && this.projectId) {
+      if (!this.localEventExportMap.has(this.projectId)) {
+        this.localEventExportMap.set(this.projectId, [...items]);
+      } else {
+        this.localEventExportMap.get(this.projectId)?.push(...items);
+      }
+      done();
+      return;
+    }
+    const payload = JSON.stringify({
+      batch: items,
+      metadata: {
+        batch_size: items.length,
+        sdk_integration: this.sdkIntegration,
+        sdk_version: this.getLibraryVersion(),
+        sdk_variant: this.getLibraryId(),
+        public_key: this.publicKey,
+        sdk_name: "langfuse-js"
+      }
+    }); // implicit conversion also of dates to strings
+    const url = `${this.baseUrl}/api/public/ingestion`;
+    const fetchOptions = this._getFetchOptions({
+      method: "POST",
+      body: payload
+    });
+    const requestPromise = this.fetchWithRetry(url, fetchOptions).then(() => done()).catch(err => {
+      done(err);
+    });
+    this.pendingIngestionPromises[promiseUUID] = requestPromise;
+    requestPromise.finally(() => {
+      delete this.pendingIngestionPromises[promiseUUID];
+    });
+  }
+  processQueueItems(queue, MAX_MSG_SIZE, BATCH_SIZE_LIMIT) {
+    let totalSize = 0;
+    const processedItems = [];
+    const remainingItems = [];
+    for (let i = 0; i < queue.length; i++) {
+      try {
+        const itemSize = new Blob([JSON.stringify(queue[i])]).size;
+        // discard item if it exceeds the maximum size per event
+        if (itemSize > MAX_MSG_SIZE) {
+          console.warn(`Item exceeds size limit (size: ${itemSize}), dropping item.`);
+          continue;
+        }
+        // if adding the next item would exceed the batch size limit, stop processing
+        if (totalSize + itemSize >= BATCH_SIZE_LIMIT) {
+          console.debug(`hit batch size limit (size: ${totalSize + itemSize})`);
+          remainingItems.push(...queue.slice(i));
+          console.log(`Remaining items: ${remainingItems.length}`);
+          console.log(`processes items: ${processedItems.length}`);
+          break;
+        }
+        // only add the item if it passes both requirements
+        totalSize += itemSize;
+        processedItems.push(queue[i]);
+      } catch (error) {
+        console.error(`[Langfuse SDK] ${error}`);
+        remainingItems.push(...queue.slice(i));
+        break;
+      }
+    }
+    return {
+      processedItems,
+      remainingItems
+    };
+  }
+  _getFetchOptions(p) {
+    const fetchOptions = {
+      method: p.method,
+      headers: {
+        "Content-Type": "application/json",
+        "X-Langfuse-Sdk-Name": "langfuse-js",
+        "X-Langfuse-Sdk-Version": this.getLibraryVersion(),
+        "X-Langfuse-Sdk-Variant": this.getLibraryId(),
+        "X-Langfuse-Sdk-Integration": this.sdkIntegration,
+        "X-Langfuse-Public-Key": this.publicKey,
+        ...this.additionalHeaders,
+        ...this.constructAuthorizationHeader(this.publicKey, this.secretKey)
+      },
+      body: p.body,
+      ...(p.fetchTimeout !== undefined ? {
+        signal: AbortSignal.timeout(p.fetchTimeout)
+      } : {})
+    };
+    return fetchOptions;
+  }
+  constructAuthorizationHeader(publicKey, secretKey) {
+    if (secretKey === undefined) {
+      return {
+        Authorization: "Bearer " + publicKey
+      };
+    } else {
+      const encodedCredentials = typeof btoa === "function" ?
+      // btoa() is available, the code is running in a browser or edge environment
+      btoa(publicKey + ":" + secretKey) :
+      // btoa() is not available, the code is running in Node.js
+      Buffer.from(publicKey + ":" + secretKey).toString("base64");
+      return {
+        Authorization: "Basic " + encodedCredentials
+      };
+    }
+  }
+  async fetchWithRetry(url, options, retryOptions) {
+    AbortSignal.timeout ??= function timeout(ms) {
+      const ctrl = new AbortController();
+      setTimeout(() => ctrl.abort(), ms);
+      return ctrl.signal;
+    };
+    return await retriable(async () => {
+      let res = null;
+      try {
+        res = await this.fetch(url, {
+          signal: AbortSignal.timeout(this.requestTimeout),
+          ...options
+        });
+      } catch (e) {
+        // fetch will only throw on network errors or on timeouts
+        throw new LangfuseFetchNetworkError(e);
+      }
+      if (res.status < 200 || res.status >= 400) {
+        const body = await res.json();
+        throw new LangfuseFetchHttpError(res, JSON.stringify(body));
+      }
+      const returnBody = await res.json();
+      if (res.status === 207 && returnBody.errors.length > 0) {
+        throw new LangfuseFetchHttpError(res, JSON.stringify(returnBody.errors));
+      }
+      return res;
+    }, {
+      ...this._retryOptions,
+      ...retryOptions
+    }, string => this._events.emit("retry", string + ", " + url + ", " + JSON.stringify(options)));
+  }
+  async fetchAndLogErrors(url, options) {
+    const res = await this.fetch(url, options);
+    const data = await res.json();
+    if (res.status < 200 || res.status >= 400) {
+      logIngestionError(new LangfuseFetchHttpError(res, JSON.stringify(data)));
+    }
+    return data;
+  }
+  async shutdownAsync() {
+    clearTimeout(this._flushTimer);
+    try {
+      await this.flushAsync();
+      await Promise.all(Object.values(this.pendingIngestionPromises).map(x => x.catch(() => {
+        // ignore errors as we are shutting down and can't deal with them anyways.
+      })));
+      // flush again in case there are new events that were added while we were waiting for the pending promises to resolve
+      await this.flushAsync();
+    } catch (e) {
+      console.error("[Langfuse SDK] Error while shutting down Langfuse", e);
+    }
+  }
+  async _exportLocalEvents(projectId) {
+    if (this.isLocalEventExportEnabled) {
+      clearTimeout(this._flushTimer);
+      await this.flushAsync();
+      const events = this.localEventExportMap.get(projectId) ?? [];
+      this.localEventExportMap.delete(projectId);
+      return events;
+    } else {
+      this._events.emit("error", "Local event exports are disabled, but _exportLocalEvents() was called.");
+      return [];
+    }
+  }
+  shutdown() {
+    console.warn("shutdown() is deprecated. It does not wait for all events to be processed. Please use shutdownAsync() instead.");
+    void this.shutdownAsync();
+  }
+  async awaitAllQueuedAndPendingRequests() {
+    clearTimeout(this._flushTimer);
+    await this.flushAsync();
+    await Promise.all(Object.values(this.pendingIngestionPromises));
+  }
+}
+class LangfuseWebStateless extends LangfuseCoreStateless {
+  constructor(params) {
+    const {
+      flushAt,
+      flushInterval,
+      publicKey,
+      enabled,
+      ...rest
+    } = params;
+    let isObservabilityEnabled = enabled === false ? false : true;
+    if (isObservabilityEnabled && !publicKey) {
+      isObservabilityEnabled = false;
+      console.warn("Langfuse public key not passed to constructor and not set as 'LANGFUSE_PUBLIC_KEY' environment variable. No observability data will be sent to Langfuse.");
+    }
+    super({
+      ...rest,
+      publicKey,
+      flushAt: flushAt ?? 1,
+      flushInterval: flushInterval ?? 0,
+      enabled: isObservabilityEnabled
+    });
+  }
+  async score(body) {
+    this.scoreStateless(body);
+    await this.awaitAllQueuedAndPendingRequests();
+    return this;
+  }
+}
+class LangfuseCore extends LangfuseCoreStateless {
+  constructor(params) {
+    const {
+      publicKey,
+      secretKey,
+      enabled,
+      _isLocalEventExportEnabled
+    } = params;
+    let isObservabilityEnabled = enabled === false ? false : true;
+    if (_isLocalEventExportEnabled) {
+      isObservabilityEnabled = true;
+    } else if (!isObservabilityEnabled) {
+      console.warn("Langfuse is disabled. No observability data will be sent to Langfuse.");
+    } else if (!secretKey) {
+      isObservabilityEnabled = false;
+      console.warn("Langfuse secret key was not passed to constructor or not set as 'LANGFUSE_SECRET_KEY' environment variable. No observability data will be sent to Langfuse.");
+    } else if (!publicKey) {
+      isObservabilityEnabled = false;
+      console.warn("Langfuse public key was not passed to constructor or not set as 'LANGFUSE_PUBLIC_KEY' environment variable. No observability data will be sent to Langfuse.");
+    }
+    super({
+      ...params,
+      enabled: isObservabilityEnabled
+    });
+    this._promptCache = new LangfusePromptCache();
+  }
+  trace(body) {
+    const id = this.traceStateless(body ?? {});
+    const t = new LangfuseTraceClient(this, id);
+    if (getEnv("DEFER") && body) {
+      try {
+        const deferRuntime = getEnv("__deferRuntime");
+        if (deferRuntime) {
+          deferRuntime.langfuseTraces([{
+            id: id,
+            name: body.name || "",
+            url: t.getTraceUrl()
+          }]);
+        }
+      } catch {}
+    }
+    return t;
+  }
+  span(body) {
+    const traceId = body.traceId || this.traceStateless({
+      name: body.name
+    });
+    const id = this.spanStateless({
+      ...body,
+      traceId
+    });
+    return new LangfuseSpanClient(this, id, traceId);
+  }
+  generation(body) {
+    const traceId = body.traceId || this.traceStateless({
+      name: body.name
+    });
+    const id = this.generationStateless({
+      ...body,
+      traceId
+    });
+    return new LangfuseGenerationClient(this, id, traceId);
+  }
+  event(body) {
+    const traceId = body.traceId || this.traceStateless({
+      name: body.name
+    });
+    const id = this.eventStateless({
+      ...body,
+      traceId
+    });
+    return new LangfuseEventClient(this, id, traceId);
+  }
+  score(body) {
+    this.scoreStateless(body);
+    return this;
+  }
+  async getDataset(name, options) {
+    const dataset = await this._getDataset(name);
+    const items = [];
+    let page = 1;
+    while (true) {
+      const itemsResponse = await this._getDatasetItems({
+        datasetName: name,
+        limit: options?.fetchItemsPageSize ?? 50,
+        page
+      });
+      items.push(...itemsResponse.data);
+      if (itemsResponse.meta.totalPages <= page) {
+        break;
+      }
+      page++;
+    }
+    const returnDataset = {
+      ...dataset,
+      description: dataset.description ?? undefined,
+      metadata: dataset.metadata ?? undefined,
+      items: items.map(item => ({
+        ...item,
+        link: async (obj, runName, runArgs) => {
+          await this.awaitAllQueuedAndPendingRequests();
+          const data = await this.createDatasetRunItem({
+            runName,
+            datasetItemId: item.id,
+            observationId: obj.observationId,
+            traceId: obj.traceId,
+            runDescription: runArgs?.description,
+            metadata: runArgs?.metadata
+          });
+          return data;
+        }
+      }))
+    };
+    return returnDataset;
+  }
+  async createPrompt(body) {
+    const labels = body.labels ?? [];
+    const promptResponse = body.type === "chat" // necessary to get types right here
+    ? await this.createPromptStateless({
+      ...body,
+      labels: body.isActive ? [...new Set([...labels, "production"])] : labels // backward compatibility for isActive
+    }) : await this.createPromptStateless({
+      ...body,
+      type: body.type ?? "text",
+      labels: body.isActive ? [...new Set([...labels, "production"])] : labels // backward compatibility for isActive
+    });
+    if (promptResponse.type === "chat") {
+      return new ChatPromptClient(promptResponse);
+    }
+    return new TextPromptClient(promptResponse);
+  }
+  async getPrompt(name, version, options) {
+    const cacheKey = this._getPromptCacheKey({
+      name,
+      version,
+      label: options?.label
+    });
+    const cachedPrompt = this._promptCache.getIncludingExpired(cacheKey);
+    if (!cachedPrompt || options?.cacheTtlSeconds === 0) {
+      try {
+        return await this._fetchPromptAndUpdateCache({
+          name,
+          version,
+          label: options?.label,
+          cacheTtlSeconds: options?.cacheTtlSeconds,
+          maxRetries: options?.maxRetries,
+          fetchTimeout: options?.fetchTimeoutMs
+        });
+      } catch (err) {
+        if (options?.fallback) {
+          const sharedFallbackParams = {
+            name,
+            version: version ?? 0,
+            labels: options.label ? [options.label] : [],
+            cacheTtlSeconds: options?.cacheTtlSeconds,
+            config: {},
+            tags: []
+          };
+          if (options.type === "chat") {
+            return new ChatPromptClient({
+              ...sharedFallbackParams,
+              type: "chat",
+              prompt: options.fallback
+            }, true);
+          } else {
+            return new TextPromptClient({
+              ...sharedFallbackParams,
+              type: "text",
+              prompt: options.fallback
+            }, true);
+          }
+        }
+        throw err;
+      }
+    }
+    if (cachedPrompt.isExpired) {
+      // If the cache is not currently being refreshed, start refreshing it and register the promise in the cache
+      if (!this._promptCache.isRefreshing(cacheKey)) {
+        const refreshPromptPromise = this._fetchPromptAndUpdateCache({
+          name,
+          version,
+          label: options?.label,
+          cacheTtlSeconds: options?.cacheTtlSeconds,
+          maxRetries: options?.maxRetries,
+          fetchTimeout: options?.fetchTimeoutMs
+        }).catch(() => {
+          console.warn(`Failed to refresh prompt cache '${cacheKey}', stale cache will be used until next refresh succeeds.`);
+        });
+        this._promptCache.addRefreshingPromise(cacheKey, refreshPromptPromise);
+      }
+      return cachedPrompt.value;
+    }
+    return cachedPrompt.value;
+  }
+  _getPromptCacheKey(params) {
+    const {
+      name,
+      version,
+      label
+    } = params;
+    const parts = [name];
+    if (version !== undefined) {
+      parts.push("version:" + version.toString());
+    } else if (label !== undefined) {
+      parts.push("label:" + label);
+    } else {
+      parts.push("label:production");
+    }
+    return parts.join("-");
+  }
+  async _fetchPromptAndUpdateCache(params) {
+    const cacheKey = this._getPromptCacheKey(params);
+    try {
+      const {
+        name,
+        version,
+        cacheTtlSeconds,
+        label,
+        maxRetries,
+        fetchTimeout
+      } = params;
+      const {
+        data,
+        fetchResult
+      } = await this.getPromptStateless(name, version, label, maxRetries, fetchTimeout);
+      if (fetchResult === "failure") {
+        throw Error(data.message ?? "Internal error while fetching prompt");
+      }
+      let prompt;
+      if (data.type === "chat") {
+        prompt = new ChatPromptClient(data);
+      } else {
+        prompt = new TextPromptClient(data);
+      }
+      this._promptCache.set(cacheKey, prompt, cacheTtlSeconds);
+      return prompt;
+    } catch (error) {
+      console.error(`[Langfuse SDK] Error while fetching prompt '${cacheKey}':`, error);
+      throw error;
+    }
+  }
+  _updateSpan(body) {
+    this.updateSpanStateless(body);
+    return this;
+  }
+  _updateGeneration(body) {
+    this.updateGenerationStateless(body);
+    return this;
+  }
+}
+class LangfuseObjectClient {
+  constructor({
+    client,
+    id,
+    traceId,
+    observationId
+  }) {
+    this.client = client;
+    this.id = id;
+    this.traceId = traceId;
+    this.observationId = observationId;
+  }
+  event(body) {
+    return this.client.event({
+      ...body,
+      traceId: this.traceId,
+      parentObservationId: this.observationId
+    });
+  }
+  span(body) {
+    return this.client.span({
+      ...body,
+      traceId: this.traceId,
+      parentObservationId: this.observationId
+    });
+  }
+  generation(body) {
+    return this.client.generation({
+      ...body,
+      traceId: this.traceId,
+      parentObservationId: this.observationId
+    });
+  }
+  score(body) {
+    this.client.score({
+      ...body,
+      traceId: this.traceId,
+      observationId: this.observationId
+    });
+    return this;
+  }
+  getTraceUrl() {
+    return `${this.client.baseUrl}/trace/${this.traceId}`;
+  }
+}
+class LangfuseTraceClient extends LangfuseObjectClient {
+  constructor(client, traceId) {
+    super({
+      client,
+      id: traceId,
+      traceId,
+      observationId: null
+    });
+  }
+  update(body) {
+    this.client.trace({
+      ...body,
+      id: this.id
+    });
+    return this;
+  }
+}
+class LangfuseObservationClient extends LangfuseObjectClient {
+  constructor(client, id, traceId) {
+    super({
+      client,
+      id,
+      traceId,
+      observationId: id
+    });
+  }
+}
+class LangfuseSpanClient extends LangfuseObservationClient {
+  constructor(client, id, traceId) {
+    super(client, id, traceId);
+  }
+  update(body) {
+    this.client._updateSpan({
+      ...body,
+      id: this.id,
+      traceId: this.traceId
+    });
+    return this;
+  }
+  end(body) {
+    this.client._updateSpan({
+      ...body,
+      id: this.id,
+      traceId: this.traceId,
+      endTime: new Date()
+    });
+    return this;
+  }
+}
+class LangfuseGenerationClient extends LangfuseObservationClient {
+  constructor(client, id, traceId) {
+    super(client, id, traceId);
+  }
+  update(body) {
+    this.client._updateGeneration({
+      ...body,
+      id: this.id,
+      traceId: this.traceId
+    });
+    return this;
+  }
+  end(body) {
+    this.client._updateGeneration({
+      ...body,
+      id: this.id,
+      traceId: this.traceId,
+      endTime: new Date()
+    });
+    return this;
+  }
+}
+class LangfuseEventClient extends LangfuseObservationClient {
+  constructor(client, id, traceId) {
+    super(client, id, traceId);
+  }
+}
+
+exports.ChatPromptClient = ChatPromptClient;
+exports.LangfuseCore = LangfuseCore;
+exports.LangfuseEventClient = LangfuseEventClient;
+exports.LangfuseGenerationClient = LangfuseGenerationClient;
+exports.LangfuseMemoryStorage = LangfuseMemoryStorage;
+exports.LangfuseObjectClient = LangfuseObjectClient;
+exports.LangfuseSpanClient = LangfuseSpanClient;
+exports.LangfuseTraceClient = LangfuseTraceClient;
+exports.LangfuseWebStateless = LangfuseWebStateless;
+exports.TextPromptClient = TextPromptClient;
+exports.utils = utils;
+//# sourceMappingURL=index.cjs.js.map
+
+
+/***/ }),
+
+/***/ 5423:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+
+var langfuseCore = __nccwpck_require__(5102);
+
+// Methods partially borrowed from quirksmode.org/js/cookies.html
+const cookieStore = {
+  getItem(key) {
+    try {
+      const nameEQ = key + "=";
+      const ca = document.cookie.split(";");
+      for (let i = 0; i < ca.length; i++) {
+        let c = ca[i];
+        while (c.charAt(0) == " ") {
+          c = c.substring(1, c.length);
+        }
+        if (c.indexOf(nameEQ) === 0) {
+          return decodeURIComponent(c.substring(nameEQ.length, c.length));
+        }
+      }
+    } catch (err) {}
+    return null;
+  },
+  setItem(key, value) {
+    try {
+      const cdomain = "",
+        expires = "",
+        secure = "";
+      const new_cookie_val = key + "=" + encodeURIComponent(value) + expires + "; path=/" + cdomain + secure;
+      document.cookie = new_cookie_val;
+    } catch (err) {
+      return;
+    }
+  },
+  removeItem(name) {
+    try {
+      cookieStore.setItem(name, "");
+    } catch (err) {
+      return;
+    }
+  },
+  clear() {
+    document.cookie = "";
+  },
+  getAllKeys() {
+    const ca = document.cookie.split(";");
+    const keys = [];
+    for (let i = 0; i < ca.length; i++) {
+      let c = ca[i];
+      while (c.charAt(0) == " ") {
+        c = c.substring(1, c.length);
+      }
+      keys.push(c.split("=")[0]);
+    }
+    return keys;
+  }
+};
+const createStorageLike = store => {
+  return {
+    getItem(key) {
+      return store.getItem(key);
+    },
+    setItem(key, value) {
+      store.setItem(key, value);
+    },
+    removeItem(key) {
+      store.removeItem(key);
+    },
+    clear() {
+      store.clear();
+    },
+    getAllKeys() {
+      const keys = [];
+      for (const key in localStorage) {
+        keys.push(key);
+      }
+      return keys;
+    }
+  };
+};
+const checkStoreIsSupported = (storage, key = "__mplssupport__") => {
+  if (!window) {
+    return false;
+  }
+  try {
+    const val = "xyz";
+    storage.setItem(key, val);
+    if (storage.getItem(key) !== val) {
+      return false;
+    }
+    storage.removeItem(key);
+    return true;
+  } catch (err) {
+    return false;
+  }
+};
+let localStore = undefined;
+let sessionStore = undefined;
+const createMemoryStorage = () => {
+  const _cache = {};
+  const store = {
+    getItem(key) {
+      return _cache[key];
+    },
+    setItem(key, value) {
+      _cache[key] = value !== null ? value : undefined;
+    },
+    removeItem(key) {
+      delete _cache[key];
+    },
+    clear() {
+      for (const key in _cache) {
+        delete _cache[key];
+      }
+    },
+    getAllKeys() {
+      const keys = [];
+      for (const key in _cache) {
+        keys.push(key);
+      }
+      return keys;
+    }
+  };
+  return store;
+};
+const getStorage = (type, window) => {
+  if (typeof window !== undefined && window) {
+    if (!localStorage) {
+      const _localStore = createStorageLike(window.localStorage);
+      localStore = checkStoreIsSupported(_localStore) ? _localStore : undefined;
+    }
+    if (!sessionStore) {
+      const _sessionStore = createStorageLike(window.sessionStorage);
+      sessionStore = checkStoreIsSupported(_sessionStore) ? _sessionStore : undefined;
+    }
+  }
+  switch (type) {
+    case "cookie":
+      return cookieStore || localStore || sessionStore || createMemoryStorage();
+    case "localStorage":
+      return localStore || sessionStore || createMemoryStorage();
+    case "sessionStorage":
+      return sessionStore || createMemoryStorage();
+    case "memory":
+      return createMemoryStorage();
+    default:
+      return createMemoryStorage();
+  }
+};
+
+var version = "3.31.0";
+
+class Langfuse extends langfuseCore.LangfuseCore {
+  constructor(params) {
+    const langfuseConfig = langfuseCore.utils.configLangfuseSDK(params);
+    super(langfuseConfig);
+    if (typeof window !== "undefined" && "Deno" in window === false) {
+      this._storageKey = params?.persistence_name ? `lf_${params.persistence_name}` : `lf_${langfuseConfig.publicKey}_langfuse`;
+      this._storage = getStorage(params?.persistence || "localStorage", window);
+    } else {
+      this._storageKey = `lf_${langfuseConfig.publicKey}_langfuse`;
+      this._storage = getStorage("memory", undefined);
+    }
+  }
+  getPersistedProperty(key) {
+    if (!this._storageCache) {
+      this._storageCache = JSON.parse(this._storage.getItem(this._storageKey) || "{}") || {};
+    }
+    return this._storageCache[key];
+  }
+  setPersistedProperty(key, value) {
+    if (!this._storageCache) {
+      this._storageCache = JSON.parse(this._storage.getItem(this._storageKey) || "{}") || {};
+    }
+    if (value === null) {
+      delete this._storageCache[key];
+    } else {
+      this._storageCache[key] = value;
+    }
+    this._storage.setItem(this._storageKey, JSON.stringify(this._storageCache));
+  }
+  fetch(url, options) {
+    return fetch(url, options);
+  }
+  getLibraryId() {
+    return "langfuse";
+  }
+  getLibraryVersion() {
+    return version;
+  }
+  getCustomUserAgent() {
+    return;
+  }
+}
+class LangfuseWeb extends langfuseCore.LangfuseWebStateless {
+  constructor(params) {
+    const langfuseConfig = langfuseCore.utils.configLangfuseSDK(params, false);
+    super(langfuseConfig);
+    if (typeof window !== "undefined") {
+      this._storageKey = params?.persistence_name ? `lf_${params.persistence_name}` : `lf_${langfuseConfig.publicKey}_langfuse`;
+      this._storage = getStorage(params?.persistence || "localStorage", window);
+    } else {
+      this._storageKey = `lf_${langfuseConfig.publicKey}_langfuse`;
+      this._storage = getStorage("memory", undefined);
+    }
+  }
+  getPersistedProperty(key) {
+    if (!this._storageCache) {
+      this._storageCache = JSON.parse(this._storage.getItem(this._storageKey) || "{}") || {};
+    }
+    return this._storageCache[key];
+  }
+  setPersistedProperty(key, value) {
+    if (!this._storageCache) {
+      this._storageCache = JSON.parse(this._storage.getItem(this._storageKey) || "{}") || {};
+    }
+    if (value === null) {
+      delete this._storageCache[key];
+    } else {
+      this._storageCache[key] = value;
+    }
+    this._storage.setItem(this._storageKey, JSON.stringify(this._storageCache));
+  }
+  fetch(url, options) {
+    return fetch(url, options);
+  }
+  getLibraryId() {
+    return "langfuse-frontend";
+  }
+  getLibraryVersion() {
+    return version;
+  }
+  getCustomUserAgent() {
+    return;
+  }
+}
+
+/**
+ * Represents a singleton instance of the Langfuse client.
+ */
+class LangfuseSingleton {
+  /**
+   * Returns the singleton instance of the Langfuse client.
+   * @param params Optional parameters for initializing the Langfuse instance. Only used for the first call.
+   * @returns The singleton instance of the Langfuse client.
+   */
+  static getInstance(params) {
+    if (!LangfuseSingleton.instance) {
+      LangfuseSingleton.instance = new Langfuse(params);
+    }
+    return LangfuseSingleton.instance;
+  }
+}
+LangfuseSingleton.instance = null; // Lazy initialization
+
+const parseInputArgs = args => {
+  let params = {};
+  params = {
+    frequency_penalty: args.frequency_penalty,
+    logit_bias: args.logit_bias,
+    logprobs: args.logprobs,
+    max_tokens: args.max_tokens,
+    n: args.n,
+    presence_penalty: args.presence_penalty,
+    seed: args.seed,
+    stop: args.stop,
+    stream: args.stream,
+    temperature: args.temperature,
+    top_p: args.top_p,
+    user: args.user,
+    response_format: args.response_format,
+    top_logprobs: args.top_logprobs
+  };
+  let input;
+  if (args && typeof args === "object" && !Array.isArray(args) && "messages" in args) {
+    input = {};
+    input.messages = args.messages;
+    if ("function_call" in args) {
+      input.function_call = args.function_call;
+    }
+    if ("functions" in args) {
+      input.functions = args.functions;
+    }
+    if ("tools" in args) {
+      input.tools = args.tools;
+    }
+    if ("tool_choice" in args) {
+      input.tool_choice = args.tool_choice;
+    }
+  } else {
+    input = args.prompt;
+  }
+  return {
+    model: args.model,
+    input: input,
+    modelParameters: params
+  };
+};
+const parseCompletionOutput = res => {
+  if (!(res instanceof Object && "choices" in res && Array.isArray(res.choices))) {
+    return "";
+  }
+  return "message" in res.choices[0] ? res.choices[0].message : res.choices[0].text ?? "";
+};
+const parseUsage = res => {
+  if (hasCompletionUsage(res)) {
+    const {
+      prompt_tokens,
+      completion_tokens,
+      total_tokens
+    } = res.usage;
+    return {
+      promptTokens: prompt_tokens,
+      completionTokens: completion_tokens,
+      totalTokens: total_tokens
+    };
+  }
+};
+const parseChunk = rawChunk => {
+  let isToolCall = false;
+  const _chunk = rawChunk;
+  const chunkData = _chunk?.choices?.[0];
+  try {
+    if ("delta" in chunkData && "tool_calls" in chunkData.delta && Array.isArray(chunkData.delta.tool_calls)) {
+      isToolCall = true;
+      return {
+        isToolCall,
+        data: chunkData.delta.tool_calls[0]
+      };
+    }
+    if ("delta" in chunkData) {
+      return {
+        isToolCall,
+        data: chunkData.delta?.content || ""
+      };
+    }
+    if ("text" in chunkData) {
+      return {
+        isToolCall,
+        data: chunkData.text || ""
+      };
+    }
+  } catch (e) {}
+  return {
+    isToolCall: false,
+    data: ""
+  };
+};
+// Type guard to check if an unknown object is a UsageResponse
+function hasCompletionUsage(obj) {
+  return obj instanceof Object && "usage" in obj && obj.usage instanceof Object && typeof obj.usage.prompt_tokens === "number" && typeof obj.usage.completion_tokens === "number" && typeof obj.usage.total_tokens === "number";
+}
+const getToolCallOutput = toolCallChunks => {
+  let name = "";
+  let toolArguments = "";
+  for (const toolCall of toolCallChunks) {
+    name = toolCall.function?.name || name;
+    toolArguments += toolCall.function?.arguments || "";
+  }
+  return {
+    tool_calls: [{
+      function: {
+        name,
+        arguments: toolArguments
+      }
+    }]
+  };
+};
+
+const isAsyncIterable = x => x != null && typeof x === "object" && typeof x[Symbol.asyncIterator] === "function";
+
+const withTracing = (tracedMethod, config) => {
+  return (...args) => wrapMethod(tracedMethod, config, ...args);
+};
+const wrapMethod = async (tracedMethod, config, ...args) => {
+  const {
+    model,
+    input,
+    modelParameters
+  } = parseInputArgs(args[0] ?? {});
+  const finalModelParams = {
+    ...modelParameters,
+    response_format: undefined
+  };
+  const finalMetadata = {
+    ...config?.metadata,
+    response_format: "response_format" in modelParameters ? modelParameters.response_format : undefined
+  };
+  let observationData = {
+    model,
+    input,
+    modelParameters: finalModelParams,
+    name: config?.generationName,
+    startTime: new Date(),
+    promptName: config?.langfusePrompt?.name,
+    promptVersion: config?.langfusePrompt?.version,
+    metadata: finalMetadata
+  };
+  let langfuseParent;
+  const hasUserProvidedParent = config && "parent" in config;
+  if (hasUserProvidedParent) {
+    langfuseParent = config.parent;
+    // Remove the parent from the config to avoid circular references in the generation body
+    const filteredConfig = {
+      ...config,
+      parent: undefined
+    };
+    observationData = {
+      ...filteredConfig,
+      ...observationData,
+      promptName: config?.promptName ?? config?.langfusePrompt?.name,
+      // Maintain backward compatibility for users who use promptName
+      promptVersion: config?.promptVersion ?? config?.langfusePrompt?.version // Maintain backward compatibility for users who use promptVersion
+    };
+  } else {
+    const langfuse = LangfuseSingleton.getInstance(config?.clientInitParams);
+    langfuseParent = langfuse.trace({
+      ...config,
+      ...observationData,
+      id: config?.traceId,
+      timestamp: observationData.startTime
+    });
+  }
+  try {
+    const res = await tracedMethod(...args);
+    // Handle stream responses
+    if (isAsyncIterable(res)) {
+      async function* tracedOutputGenerator() {
+        const response = res;
+        const textChunks = [];
+        const toolCallChunks = [];
+        let completionStartTime = null;
+        let usage = null;
+        for await (const rawChunk of response) {
+          completionStartTime = completionStartTime ?? new Date();
+          if (typeof rawChunk === "object" && rawChunk != null && "usage" in rawChunk) {
+            usage = rawChunk.usage;
+          }
+          const processedChunk = parseChunk(rawChunk);
+          if (!processedChunk.isToolCall) {
+            textChunks.push(processedChunk.data);
+          } else {
+            toolCallChunks.push(processedChunk.data);
+          }
+          yield rawChunk;
+        }
+        const output = toolCallChunks.length > 0 ? getToolCallOutput(toolCallChunks) : textChunks.join("");
+        langfuseParent.generation({
+          ...observationData,
+          output,
+          endTime: new Date(),
+          completionStartTime,
+          usage: usage ? {
+            input: "prompt_tokens" in usage ? usage.prompt_tokens : undefined,
+            output: "completion_tokens" in usage ? usage.completion_tokens : undefined,
+            total: "total_tokens" in usage ? usage.total_tokens : undefined
+          } : undefined
+        });
+        if (!hasUserProvidedParent) {
+          langfuseParent.update({
+            output
+          });
+        }
+      }
+      return tracedOutputGenerator();
+    }
+    const output = parseCompletionOutput(res);
+    const usage = parseUsage(res);
+    langfuseParent.generation({
+      ...observationData,
+      output,
+      endTime: new Date(),
+      usage
+    });
+    if (!hasUserProvidedParent) {
+      langfuseParent.update({
+        output
+      });
+    }
+    return res;
+  } catch (error) {
+    langfuseParent.generation({
+      ...observationData,
+      endTime: new Date(),
+      statusMessage: String(error),
+      level: "ERROR",
+      usage: {
+        inputCost: 0,
+        outputCost: 0,
+        totalCost: 0
+      }
+    });
+    throw error;
+  }
+};
+
+/**
+ * Wraps an OpenAI SDK object with Langfuse tracing. Function calls are extended with a tracer that logs detailed information about the call, including the method name,
+ * input parameters, and output.
+ *
+ * @param {T} sdk - The OpenAI SDK object to be wrapped.
+ * @param {LangfuseConfig} [langfuseConfig] - Optional configuration object for the wrapper.
+ * @param {string} [langfuseConfig.traceName] - The name to use for tracing. If not provided, a default name based on the SDK's constructor name and the method name will be used.
+ * @param {string} [langfuseConfig.sessionId] - Optional session ID for tracing.
+ * @param {string} [langfuseConfig.userId] - Optional user ID for tracing.
+ * @param {string} [langfuseConfig.release] - Optional release version for tracing.
+ * @param {string} [langfuseConfig.version] - Optional version for tracing.
+ * @param {string} [langfuseConfig.metadata] - Optional metadata for tracing.
+ * @param {string} [langfuseConfig.tags] - Optional tags for tracing.
+ * @returns {T} - A proxy of the original SDK object with methods wrapped for tracing.
+ *
+ * @example
+ * const client = new OpenAI();
+ * const res = observeOpenAI(client, { traceName: "My.OpenAI.Chat.Trace" }).chat.completions.create({
+ *      messages: [{ role: "system", content: "Say this is a test!" }],
+        model: "gpt-3.5-turbo",
+        user: "langfuse",
+        max_tokens: 300
+ * });
+ * */
+const observeOpenAI = (sdk, langfuseConfig) => {
+  return new Proxy(sdk, {
+    get(wrappedSdk, propKey, proxy) {
+      const originalProperty = wrappedSdk[propKey];
+      const defaultGenerationName = `${sdk.constructor?.name}.${propKey.toString()}`;
+      const generationName = langfuseConfig?.generationName ?? defaultGenerationName;
+      const config = {
+        ...langfuseConfig,
+        generationName
+      };
+      // Add a flushAsync method to the OpenAI SDK that flushes the Langfuse client
+      if (propKey === "flushAsync") {
+        let langfuseClient;
+        // Flush the correct client depending on whether a parent client is provided
+        if (langfuseConfig && "parent" in langfuseConfig) {
+          langfuseClient = langfuseConfig.parent.client;
+        } else {
+          langfuseClient = LangfuseSingleton.getInstance();
+        }
+        return langfuseClient.flushAsync.bind(langfuseClient);
+      }
+      // Add a shutdownAsync method to the OpenAI SDK that flushes the Langfuse client
+      if (propKey === "shutdownAsync") {
+        let langfuseClient;
+        // Flush the correct client depending on whether a parent client is provided
+        if (langfuseConfig && "parent" in langfuseConfig) {
+          langfuseClient = langfuseConfig.parent.client;
+        } else {
+          langfuseClient = LangfuseSingleton.getInstance();
+        }
+        return langfuseClient.shutdownAsync.bind(langfuseClient);
+      }
+      // Trace methods of the OpenAI SDK
+      if (typeof originalProperty === "function") {
+        return withTracing(originalProperty.bind(wrappedSdk), config);
+      }
+      const isNestedOpenAIObject = originalProperty && !Array.isArray(originalProperty) && !(originalProperty instanceof Date) && typeof originalProperty === "object";
+      // Recursively wrap nested objects to ensure all nested properties or methods are also traced
+      if (isNestedOpenAIObject) {
+        return observeOpenAI(originalProperty, config);
+      }
+      // Fallback to returning the original value
+      return Reflect.get(wrappedSdk, propKey, proxy);
+    }
+  });
+};
+
+exports.Langfuse = Langfuse;
+exports.LangfuseWeb = LangfuseWeb;
+exports["default"] = Langfuse;
+exports.observeOpenAI = observeOpenAI;
+//# sourceMappingURL=index.cjs.js.map
+
+
+/***/ }),
+
 /***/ 900:
 /***/ ((module) => {
 
@@ -6593,6 +9039,784 @@ function plural(ms, msAbs, n, name) {
   var isPlural = msAbs >= n * 1.5;
   return Math.round(ms / n) + ' ' + name + (isPlural ? 's' : '');
 }
+
+
+/***/ }),
+
+/***/ 8272:
+/***/ (function(module) {
+
+(function (global, factory) {
+   true ? module.exports = factory() :
+  0;
+}(this, (function () { 'use strict';
+
+  /*!
+   * mustache.js - Logic-less {{mustache}} templates with JavaScript
+   * http://github.com/janl/mustache.js
+   */
+
+  var objectToString = Object.prototype.toString;
+  var isArray = Array.isArray || function isArrayPolyfill (object) {
+    return objectToString.call(object) === '[object Array]';
+  };
+
+  function isFunction (object) {
+    return typeof object === 'function';
+  }
+
+  /**
+   * More correct typeof string handling array
+   * which normally returns typeof 'object'
+   */
+  function typeStr (obj) {
+    return isArray(obj) ? 'array' : typeof obj;
+  }
+
+  function escapeRegExp (string) {
+    return string.replace(/[\-\[\]{}()*+?.,\\\^$|#\s]/g, '\\$&');
+  }
+
+  /**
+   * Null safe way of checking whether or not an object,
+   * including its prototype, has a given property
+   */
+  function hasProperty (obj, propName) {
+    return obj != null && typeof obj === 'object' && (propName in obj);
+  }
+
+  /**
+   * Safe way of detecting whether or not the given thing is a primitive and
+   * whether it has the given property
+   */
+  function primitiveHasOwnProperty (primitive, propName) {
+    return (
+      primitive != null
+      && typeof primitive !== 'object'
+      && primitive.hasOwnProperty
+      && primitive.hasOwnProperty(propName)
+    );
+  }
+
+  // Workaround for https://issues.apache.org/jira/browse/COUCHDB-577
+  // See https://github.com/janl/mustache.js/issues/189
+  var regExpTest = RegExp.prototype.test;
+  function testRegExp (re, string) {
+    return regExpTest.call(re, string);
+  }
+
+  var nonSpaceRe = /\S/;
+  function isWhitespace (string) {
+    return !testRegExp(nonSpaceRe, string);
+  }
+
+  var entityMap = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+    '/': '&#x2F;',
+    '`': '&#x60;',
+    '=': '&#x3D;'
+  };
+
+  function escapeHtml (string) {
+    return String(string).replace(/[&<>"'`=\/]/g, function fromEntityMap (s) {
+      return entityMap[s];
+    });
+  }
+
+  var whiteRe = /\s*/;
+  var spaceRe = /\s+/;
+  var equalsRe = /\s*=/;
+  var curlyRe = /\s*\}/;
+  var tagRe = /#|\^|\/|>|\{|&|=|!/;
+
+  /**
+   * Breaks up the given `template` string into a tree of tokens. If the `tags`
+   * argument is given here it must be an array with two string values: the
+   * opening and closing tags used in the template (e.g. [ "<%", "%>" ]). Of
+   * course, the default is to use mustaches (i.e. mustache.tags).
+   *
+   * A token is an array with at least 4 elements. The first element is the
+   * mustache symbol that was used inside the tag, e.g. "#" or "&". If the tag
+   * did not contain a symbol (i.e. {{myValue}}) this element is "name". For
+   * all text that appears outside a symbol this element is "text".
+   *
+   * The second element of a token is its "value". For mustache tags this is
+   * whatever else was inside the tag besides the opening symbol. For text tokens
+   * this is the text itself.
+   *
+   * The third and fourth elements of the token are the start and end indices,
+   * respectively, of the token in the original template.
+   *
+   * Tokens that are the root node of a subtree contain two more elements: 1) an
+   * array of tokens in the subtree and 2) the index in the original template at
+   * which the closing tag for that section begins.
+   *
+   * Tokens for partials also contain two more elements: 1) a string value of
+   * indendation prior to that tag and 2) the index of that tag on that line -
+   * eg a value of 2 indicates the partial is the third tag on this line.
+   */
+  function parseTemplate (template, tags) {
+    if (!template)
+      return [];
+    var lineHasNonSpace = false;
+    var sections = [];     // Stack to hold section tokens
+    var tokens = [];       // Buffer to hold the tokens
+    var spaces = [];       // Indices of whitespace tokens on the current line
+    var hasTag = false;    // Is there a {{tag}} on the current line?
+    var nonSpace = false;  // Is there a non-space char on the current line?
+    var indentation = '';  // Tracks indentation for tags that use it
+    var tagIndex = 0;      // Stores a count of number of tags encountered on a line
+
+    // Strips all whitespace tokens array for the current line
+    // if there was a {{#tag}} on it and otherwise only space.
+    function stripSpace () {
+      if (hasTag && !nonSpace) {
+        while (spaces.length)
+          delete tokens[spaces.pop()];
+      } else {
+        spaces = [];
+      }
+
+      hasTag = false;
+      nonSpace = false;
+    }
+
+    var openingTagRe, closingTagRe, closingCurlyRe;
+    function compileTags (tagsToCompile) {
+      if (typeof tagsToCompile === 'string')
+        tagsToCompile = tagsToCompile.split(spaceRe, 2);
+
+      if (!isArray(tagsToCompile) || tagsToCompile.length !== 2)
+        throw new Error('Invalid tags: ' + tagsToCompile);
+
+      openingTagRe = new RegExp(escapeRegExp(tagsToCompile[0]) + '\\s*');
+      closingTagRe = new RegExp('\\s*' + escapeRegExp(tagsToCompile[1]));
+      closingCurlyRe = new RegExp('\\s*' + escapeRegExp('}' + tagsToCompile[1]));
+    }
+
+    compileTags(tags || mustache.tags);
+
+    var scanner = new Scanner(template);
+
+    var start, type, value, chr, token, openSection;
+    while (!scanner.eos()) {
+      start = scanner.pos;
+
+      // Match any text between tags.
+      value = scanner.scanUntil(openingTagRe);
+
+      if (value) {
+        for (var i = 0, valueLength = value.length; i < valueLength; ++i) {
+          chr = value.charAt(i);
+
+          if (isWhitespace(chr)) {
+            spaces.push(tokens.length);
+            indentation += chr;
+          } else {
+            nonSpace = true;
+            lineHasNonSpace = true;
+            indentation += ' ';
+          }
+
+          tokens.push([ 'text', chr, start, start + 1 ]);
+          start += 1;
+
+          // Check for whitespace on the current line.
+          if (chr === '\n') {
+            stripSpace();
+            indentation = '';
+            tagIndex = 0;
+            lineHasNonSpace = false;
+          }
+        }
+      }
+
+      // Match the opening tag.
+      if (!scanner.scan(openingTagRe))
+        break;
+
+      hasTag = true;
+
+      // Get the tag type.
+      type = scanner.scan(tagRe) || 'name';
+      scanner.scan(whiteRe);
+
+      // Get the tag value.
+      if (type === '=') {
+        value = scanner.scanUntil(equalsRe);
+        scanner.scan(equalsRe);
+        scanner.scanUntil(closingTagRe);
+      } else if (type === '{') {
+        value = scanner.scanUntil(closingCurlyRe);
+        scanner.scan(curlyRe);
+        scanner.scanUntil(closingTagRe);
+        type = '&';
+      } else {
+        value = scanner.scanUntil(closingTagRe);
+      }
+
+      // Match the closing tag.
+      if (!scanner.scan(closingTagRe))
+        throw new Error('Unclosed tag at ' + scanner.pos);
+
+      if (type == '>') {
+        token = [ type, value, start, scanner.pos, indentation, tagIndex, lineHasNonSpace ];
+      } else {
+        token = [ type, value, start, scanner.pos ];
+      }
+      tagIndex++;
+      tokens.push(token);
+
+      if (type === '#' || type === '^') {
+        sections.push(token);
+      } else if (type === '/') {
+        // Check section nesting.
+        openSection = sections.pop();
+
+        if (!openSection)
+          throw new Error('Unopened section "' + value + '" at ' + start);
+
+        if (openSection[1] !== value)
+          throw new Error('Unclosed section "' + openSection[1] + '" at ' + start);
+      } else if (type === 'name' || type === '{' || type === '&') {
+        nonSpace = true;
+      } else if (type === '=') {
+        // Set the tags for the next time around.
+        compileTags(value);
+      }
+    }
+
+    stripSpace();
+
+    // Make sure there are no open sections when we're done.
+    openSection = sections.pop();
+
+    if (openSection)
+      throw new Error('Unclosed section "' + openSection[1] + '" at ' + scanner.pos);
+
+    return nestTokens(squashTokens(tokens));
+  }
+
+  /**
+   * Combines the values of consecutive text tokens in the given `tokens` array
+   * to a single token.
+   */
+  function squashTokens (tokens) {
+    var squashedTokens = [];
+
+    var token, lastToken;
+    for (var i = 0, numTokens = tokens.length; i < numTokens; ++i) {
+      token = tokens[i];
+
+      if (token) {
+        if (token[0] === 'text' && lastToken && lastToken[0] === 'text') {
+          lastToken[1] += token[1];
+          lastToken[3] = token[3];
+        } else {
+          squashedTokens.push(token);
+          lastToken = token;
+        }
+      }
+    }
+
+    return squashedTokens;
+  }
+
+  /**
+   * Forms the given array of `tokens` into a nested tree structure where
+   * tokens that represent a section have two additional items: 1) an array of
+   * all tokens that appear in that section and 2) the index in the original
+   * template that represents the end of that section.
+   */
+  function nestTokens (tokens) {
+    var nestedTokens = [];
+    var collector = nestedTokens;
+    var sections = [];
+
+    var token, section;
+    for (var i = 0, numTokens = tokens.length; i < numTokens; ++i) {
+      token = tokens[i];
+
+      switch (token[0]) {
+        case '#':
+        case '^':
+          collector.push(token);
+          sections.push(token);
+          collector = token[4] = [];
+          break;
+        case '/':
+          section = sections.pop();
+          section[5] = token[2];
+          collector = sections.length > 0 ? sections[sections.length - 1][4] : nestedTokens;
+          break;
+        default:
+          collector.push(token);
+      }
+    }
+
+    return nestedTokens;
+  }
+
+  /**
+   * A simple string scanner that is used by the template parser to find
+   * tokens in template strings.
+   */
+  function Scanner (string) {
+    this.string = string;
+    this.tail = string;
+    this.pos = 0;
+  }
+
+  /**
+   * Returns `true` if the tail is empty (end of string).
+   */
+  Scanner.prototype.eos = function eos () {
+    return this.tail === '';
+  };
+
+  /**
+   * Tries to match the given regular expression at the current position.
+   * Returns the matched text if it can match, the empty string otherwise.
+   */
+  Scanner.prototype.scan = function scan (re) {
+    var match = this.tail.match(re);
+
+    if (!match || match.index !== 0)
+      return '';
+
+    var string = match[0];
+
+    this.tail = this.tail.substring(string.length);
+    this.pos += string.length;
+
+    return string;
+  };
+
+  /**
+   * Skips all text until the given regular expression can be matched. Returns
+   * the skipped string, which is the entire tail if no match can be made.
+   */
+  Scanner.prototype.scanUntil = function scanUntil (re) {
+    var index = this.tail.search(re), match;
+
+    switch (index) {
+      case -1:
+        match = this.tail;
+        this.tail = '';
+        break;
+      case 0:
+        match = '';
+        break;
+      default:
+        match = this.tail.substring(0, index);
+        this.tail = this.tail.substring(index);
+    }
+
+    this.pos += match.length;
+
+    return match;
+  };
+
+  /**
+   * Represents a rendering context by wrapping a view object and
+   * maintaining a reference to the parent context.
+   */
+  function Context (view, parentContext) {
+    this.view = view;
+    this.cache = { '.': this.view };
+    this.parent = parentContext;
+  }
+
+  /**
+   * Creates a new context using the given view with this context
+   * as the parent.
+   */
+  Context.prototype.push = function push (view) {
+    return new Context(view, this);
+  };
+
+  /**
+   * Returns the value of the given name in this context, traversing
+   * up the context hierarchy if the value is absent in this context's view.
+   */
+  Context.prototype.lookup = function lookup (name) {
+    var cache = this.cache;
+
+    var value;
+    if (cache.hasOwnProperty(name)) {
+      value = cache[name];
+    } else {
+      var context = this, intermediateValue, names, index, lookupHit = false;
+
+      while (context) {
+        if (name.indexOf('.') > 0) {
+          intermediateValue = context.view;
+          names = name.split('.');
+          index = 0;
+
+          /**
+           * Using the dot notion path in `name`, we descend through the
+           * nested objects.
+           *
+           * To be certain that the lookup has been successful, we have to
+           * check if the last object in the path actually has the property
+           * we are looking for. We store the result in `lookupHit`.
+           *
+           * This is specially necessary for when the value has been set to
+           * `undefined` and we want to avoid looking up parent contexts.
+           *
+           * In the case where dot notation is used, we consider the lookup
+           * to be successful even if the last "object" in the path is
+           * not actually an object but a primitive (e.g., a string, or an
+           * integer), because it is sometimes useful to access a property
+           * of an autoboxed primitive, such as the length of a string.
+           **/
+          while (intermediateValue != null && index < names.length) {
+            if (index === names.length - 1)
+              lookupHit = (
+                hasProperty(intermediateValue, names[index])
+                || primitiveHasOwnProperty(intermediateValue, names[index])
+              );
+
+            intermediateValue = intermediateValue[names[index++]];
+          }
+        } else {
+          intermediateValue = context.view[name];
+
+          /**
+           * Only checking against `hasProperty`, which always returns `false` if
+           * `context.view` is not an object. Deliberately omitting the check
+           * against `primitiveHasOwnProperty` if dot notation is not used.
+           *
+           * Consider this example:
+           * ```
+           * Mustache.render("The length of a football field is {{#length}}{{length}}{{/length}}.", {length: "100 yards"})
+           * ```
+           *
+           * If we were to check also against `primitiveHasOwnProperty`, as we do
+           * in the dot notation case, then render call would return:
+           *
+           * "The length of a football field is 9."
+           *
+           * rather than the expected:
+           *
+           * "The length of a football field is 100 yards."
+           **/
+          lookupHit = hasProperty(context.view, name);
+        }
+
+        if (lookupHit) {
+          value = intermediateValue;
+          break;
+        }
+
+        context = context.parent;
+      }
+
+      cache[name] = value;
+    }
+
+    if (isFunction(value))
+      value = value.call(this.view);
+
+    return value;
+  };
+
+  /**
+   * A Writer knows how to take a stream of tokens and render them to a
+   * string, given a context. It also maintains a cache of templates to
+   * avoid the need to parse the same template twice.
+   */
+  function Writer () {
+    this.templateCache = {
+      _cache: {},
+      set: function set (key, value) {
+        this._cache[key] = value;
+      },
+      get: function get (key) {
+        return this._cache[key];
+      },
+      clear: function clear () {
+        this._cache = {};
+      }
+    };
+  }
+
+  /**
+   * Clears all cached templates in this writer.
+   */
+  Writer.prototype.clearCache = function clearCache () {
+    if (typeof this.templateCache !== 'undefined') {
+      this.templateCache.clear();
+    }
+  };
+
+  /**
+   * Parses and caches the given `template` according to the given `tags` or
+   * `mustache.tags` if `tags` is omitted,  and returns the array of tokens
+   * that is generated from the parse.
+   */
+  Writer.prototype.parse = function parse (template, tags) {
+    var cache = this.templateCache;
+    var cacheKey = template + ':' + (tags || mustache.tags).join(':');
+    var isCacheEnabled = typeof cache !== 'undefined';
+    var tokens = isCacheEnabled ? cache.get(cacheKey) : undefined;
+
+    if (tokens == undefined) {
+      tokens = parseTemplate(template, tags);
+      isCacheEnabled && cache.set(cacheKey, tokens);
+    }
+    return tokens;
+  };
+
+  /**
+   * High-level method that is used to render the given `template` with
+   * the given `view`.
+   *
+   * The optional `partials` argument may be an object that contains the
+   * names and templates of partials that are used in the template. It may
+   * also be a function that is used to load partial templates on the fly
+   * that takes a single argument: the name of the partial.
+   *
+   * If the optional `config` argument is given here, then it should be an
+   * object with a `tags` attribute or an `escape` attribute or both.
+   * If an array is passed, then it will be interpreted the same way as
+   * a `tags` attribute on a `config` object.
+   *
+   * The `tags` attribute of a `config` object must be an array with two
+   * string values: the opening and closing tags used in the template (e.g.
+   * [ "<%", "%>" ]). The default is to mustache.tags.
+   *
+   * The `escape` attribute of a `config` object must be a function which
+   * accepts a string as input and outputs a safely escaped string.
+   * If an `escape` function is not provided, then an HTML-safe string
+   * escaping function is used as the default.
+   */
+  Writer.prototype.render = function render (template, view, partials, config) {
+    var tags = this.getConfigTags(config);
+    var tokens = this.parse(template, tags);
+    var context = (view instanceof Context) ? view : new Context(view, undefined);
+    return this.renderTokens(tokens, context, partials, template, config);
+  };
+
+  /**
+   * Low-level method that renders the given array of `tokens` using
+   * the given `context` and `partials`.
+   *
+   * Note: The `originalTemplate` is only ever used to extract the portion
+   * of the original template that was contained in a higher-order section.
+   * If the template doesn't use higher-order sections, this argument may
+   * be omitted.
+   */
+  Writer.prototype.renderTokens = function renderTokens (tokens, context, partials, originalTemplate, config) {
+    var buffer = '';
+
+    var token, symbol, value;
+    for (var i = 0, numTokens = tokens.length; i < numTokens; ++i) {
+      value = undefined;
+      token = tokens[i];
+      symbol = token[0];
+
+      if (symbol === '#') value = this.renderSection(token, context, partials, originalTemplate, config);
+      else if (symbol === '^') value = this.renderInverted(token, context, partials, originalTemplate, config);
+      else if (symbol === '>') value = this.renderPartial(token, context, partials, config);
+      else if (symbol === '&') value = this.unescapedValue(token, context);
+      else if (symbol === 'name') value = this.escapedValue(token, context, config);
+      else if (symbol === 'text') value = this.rawValue(token);
+
+      if (value !== undefined)
+        buffer += value;
+    }
+
+    return buffer;
+  };
+
+  Writer.prototype.renderSection = function renderSection (token, context, partials, originalTemplate, config) {
+    var self = this;
+    var buffer = '';
+    var value = context.lookup(token[1]);
+
+    // This function is used to render an arbitrary template
+    // in the current context by higher-order sections.
+    function subRender (template) {
+      return self.render(template, context, partials, config);
+    }
+
+    if (!value) return;
+
+    if (isArray(value)) {
+      for (var j = 0, valueLength = value.length; j < valueLength; ++j) {
+        buffer += this.renderTokens(token[4], context.push(value[j]), partials, originalTemplate, config);
+      }
+    } else if (typeof value === 'object' || typeof value === 'string' || typeof value === 'number') {
+      buffer += this.renderTokens(token[4], context.push(value), partials, originalTemplate, config);
+    } else if (isFunction(value)) {
+      if (typeof originalTemplate !== 'string')
+        throw new Error('Cannot use higher-order sections without the original template');
+
+      // Extract the portion of the original template that the section contains.
+      value = value.call(context.view, originalTemplate.slice(token[3], token[5]), subRender);
+
+      if (value != null)
+        buffer += value;
+    } else {
+      buffer += this.renderTokens(token[4], context, partials, originalTemplate, config);
+    }
+    return buffer;
+  };
+
+  Writer.prototype.renderInverted = function renderInverted (token, context, partials, originalTemplate, config) {
+    var value = context.lookup(token[1]);
+
+    // Use JavaScript's definition of falsy. Include empty arrays.
+    // See https://github.com/janl/mustache.js/issues/186
+    if (!value || (isArray(value) && value.length === 0))
+      return this.renderTokens(token[4], context, partials, originalTemplate, config);
+  };
+
+  Writer.prototype.indentPartial = function indentPartial (partial, indentation, lineHasNonSpace) {
+    var filteredIndentation = indentation.replace(/[^ \t]/g, '');
+    var partialByNl = partial.split('\n');
+    for (var i = 0; i < partialByNl.length; i++) {
+      if (partialByNl[i].length && (i > 0 || !lineHasNonSpace)) {
+        partialByNl[i] = filteredIndentation + partialByNl[i];
+      }
+    }
+    return partialByNl.join('\n');
+  };
+
+  Writer.prototype.renderPartial = function renderPartial (token, context, partials, config) {
+    if (!partials) return;
+    var tags = this.getConfigTags(config);
+
+    var value = isFunction(partials) ? partials(token[1]) : partials[token[1]];
+    if (value != null) {
+      var lineHasNonSpace = token[6];
+      var tagIndex = token[5];
+      var indentation = token[4];
+      var indentedValue = value;
+      if (tagIndex == 0 && indentation) {
+        indentedValue = this.indentPartial(value, indentation, lineHasNonSpace);
+      }
+      var tokens = this.parse(indentedValue, tags);
+      return this.renderTokens(tokens, context, partials, indentedValue, config);
+    }
+  };
+
+  Writer.prototype.unescapedValue = function unescapedValue (token, context) {
+    var value = context.lookup(token[1]);
+    if (value != null)
+      return value;
+  };
+
+  Writer.prototype.escapedValue = function escapedValue (token, context, config) {
+    var escape = this.getConfigEscape(config) || mustache.escape;
+    var value = context.lookup(token[1]);
+    if (value != null)
+      return (typeof value === 'number' && escape === mustache.escape) ? String(value) : escape(value);
+  };
+
+  Writer.prototype.rawValue = function rawValue (token) {
+    return token[1];
+  };
+
+  Writer.prototype.getConfigTags = function getConfigTags (config) {
+    if (isArray(config)) {
+      return config;
+    }
+    else if (config && typeof config === 'object') {
+      return config.tags;
+    }
+    else {
+      return undefined;
+    }
+  };
+
+  Writer.prototype.getConfigEscape = function getConfigEscape (config) {
+    if (config && typeof config === 'object' && !isArray(config)) {
+      return config.escape;
+    }
+    else {
+      return undefined;
+    }
+  };
+
+  var mustache = {
+    name: 'mustache.js',
+    version: '4.2.0',
+    tags: [ '{{', '}}' ],
+    clearCache: undefined,
+    escape: undefined,
+    parse: undefined,
+    render: undefined,
+    Scanner: undefined,
+    Context: undefined,
+    Writer: undefined,
+    /**
+     * Allows a user to override the default caching strategy, by providing an
+     * object with set, get and clear methods. This can also be used to disable
+     * the cache by setting it to the literal `undefined`.
+     */
+    set templateCache (cache) {
+      defaultWriter.templateCache = cache;
+    },
+    /**
+     * Gets the default or overridden caching object from the default writer.
+     */
+    get templateCache () {
+      return defaultWriter.templateCache;
+    }
+  };
+
+  // All high-level mustache.* functions use this writer.
+  var defaultWriter = new Writer();
+
+  /**
+   * Clears all cached templates in the default writer.
+   */
+  mustache.clearCache = function clearCache () {
+    return defaultWriter.clearCache();
+  };
+
+  /**
+   * Parses and caches the given template in the default writer and returns the
+   * array of tokens it contains. Doing this ahead of time avoids the need to
+   * parse templates on the fly as they are rendered.
+   */
+  mustache.parse = function parse (template, tags) {
+    return defaultWriter.parse(template, tags);
+  };
+
+  /**
+   * Renders the `template` with the given `view`, `partials`, and `config`
+   * using the default writer.
+   */
+  mustache.render = function render (template, view, partials, config) {
+    if (typeof template !== 'string') {
+      throw new TypeError('Invalid template! Template should be a "string" ' +
+                          'but "' + typeStr(template) + '" was given as the first ' +
+                          'argument for mustache#render(template, view, partials)');
+    }
+
+    return defaultWriter.render(template, view, partials, config);
+  };
+
+  // Export the escaping function so that the user may override it.
+  // See https://github.com/janl/mustache.js/issues/244
+  mustache.escape = escapeHtml;
+
+  // Export these mainly for testing, but also for advanced usage.
+  mustache.Scanner = Scanner;
+  mustache.Context = Context;
+  mustache.Writer = Writer;
+
+  return mustache;
+
+})));
 
 
 /***/ }),

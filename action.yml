@@ -11,6 +11,19 @@ inputs:
     description: "OpenAI API model."
     required: false
     default: "gpt-4"
+  
+  LANGFUSE_SECRET_KEY:
+    description: "Langfuse secret key"
+    required: false
+  
+  LANGFUSE_PUBLIC_KEY:
+    description: "Langfuse public key"
+    required: false
+  
+  LANGFUSE_CLOUD_HOST:
+    description: "Langfuse cloud host"
+    required: false
+
   exclude:
     description: "Glob patterns to exclude files from the diff analysis"
     required: false
