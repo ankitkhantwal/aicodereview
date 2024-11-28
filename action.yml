@@ -20,8 +20,8 @@ inputs:
     description: "Langfuse public key"
     required: false
   
-  LANGFUSE_CLOUD_HOST:
-    description: "Langfuse cloud host"
+  LANGFUSE_HOST:
+    description: "Langfuse host"
     required: false
 
   exclude:
