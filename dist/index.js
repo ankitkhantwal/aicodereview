@@ -60,7 +60,6 @@ const INPUT_LANGFUSE_SECRET_KEY = "LANGFUSE_SECRET_KEY";
 const INPUT_LANGFUSE_PUBLIC_KEY = "LANGFUSE_PUBLIC_KEY";
 // Initialize Langfuse
 const langfuse = new langfuse_1.Langfuse({
-    release: process.env.LANGFUSE_RELEASE || "unknown",
     requestTimeout: 10000,
     enabled: Boolean(core.getInput(INPUT_LANGFUSE_SECRET_KEY)),
     secretKey: core.getInput(INPUT_LANGFUSE_SECRET_KEY),

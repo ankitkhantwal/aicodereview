@@ -53,7 +53,6 @@ interface Comment {
 
 // Initialize Langfuse
 const langfuse = new Langfuse({
-  release: process.env.LANGFUSE_RELEASE || "unknown",
   requestTimeout: 10000,
   enabled: Boolean(core.getInput(INPUT_LANGFUSE_SECRET_KEY)),
   secretKey: core.getInput(INPUT_LANGFUSE_SECRET_KEY),
