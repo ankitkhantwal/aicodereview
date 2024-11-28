@@ -211,9 +211,9 @@ function getAIResponse(prompt, generation) {
     var _a, _b;
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            const response = yield openai.chat.completions.create(Object.assign(Object.assign({}, OPENAI_QUERY_CONFIG), { messages: [
+            const response = yield openai.chat.completions.create(Object.assign(Object.assign({}, OPENAI_QUERY_CONFIG), { response_format: { type: "json_object" }, messages: [
                     {
-                        role: "user",
+                        role: "system",
                         content: prompt,
                     },
                 ] }));
