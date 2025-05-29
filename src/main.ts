@@ -235,9 +235,19 @@ async function getAIResponse(
   generation: any
 ): Promise<AIReview[] | null> {
   try {
+    console.log("OpenAI Request Configuration:", {
+      model: OPENAI_QUERY_CONFIG.model,
+      temperature: OPENAI_QUERY_CONFIG.temperature,
+      max_tokens: OPENAI_QUERY_CONFIG.max_tokens,
+      top_p: OPENAI_QUERY_CONFIG.top_p,
+      frequency_penalty: OPENAI_QUERY_CONFIG.frequency_penalty,
+      presence_penalty: OPENAI_QUERY_CONFIG.presence_penalty,
+    });
+
+    console.log("OpenAI Request Prompt:", prompt);
+
     const response = await openai.chat.completions.create({
       ...OPENAI_QUERY_CONFIG,
-      // response_format: {type: "json_object"},
       messages: [
         {
           role: "system",
@@ -246,18 +256,38 @@ async function getAIResponse(
       ],
     });
 
+    console.log("OpenAI Response:", {
+      model: response.model,
+      usage: response.usage,
+      finish_reason: response.choices[0].finish_reason,
+    });
+
     const aiContent = response.choices[0].message?.content?.trim();
     if (!aiContent) {
-      console.warn("AI response is empty.");
+      console.log("OpenAI Response Content: Empty");
       return null;
     }
 
-    console.log("AI response:", aiContent);
+    console.log("OpenAI Response Content:", aiContent);
 
-    const parsed = JSON.parse(aiContent);
-    return parsed.reviews as AIReview[];
+    try {
+      const parsedResponse = JSON.parse(aiContent);
+      console.log("Parsed AI Response:", parsedResponse);
+      return parsedResponse.reviews || [];
+    } catch (error) {
+      console.error("Failed to parse AI response:", error);
+      console.error("Raw AI response that failed to parse:", aiContent);
+      return null;
+    }
   } catch (error) {
-    console.error("Error fetching AI response:", (error as Error).message);
+    console.error("Error fetching AI response:", error);
+    if (error instanceof Error) {
+      console.error("Error details:", {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      });
+    }
     return null;
   }
 }
