@@ -237,7 +237,7 @@ async function getAIResponse(
   try {
     const response = await openai.chat.completions.create({
       ...OPENAI_QUERY_CONFIG,
-      response_format: {type: "json_object"},
+      // response_format: {type: "json_object"},
       messages: [
         {
           role: "system",
